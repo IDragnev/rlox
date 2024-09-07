@@ -1,6 +1,4 @@
 use std::{
-    iter::Peekable,
-    str::Chars,
     collections::HashMap,
 };
 
@@ -51,8 +49,6 @@ pub enum TokenType {
     True,
     Var,
     While,
-
-    EOF,
 }
 
 #[derive(Clone, Debug)]
@@ -89,6 +85,7 @@ impl Token {
         }
     }
 }
+
 #[derive(Clone, Debug)]
 pub struct TokenError {
     line: u64,
@@ -96,7 +93,7 @@ pub struct TokenError {
     error: TokenErrorType,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum TokenErrorType {
     UnexpectedCharacter,
     UnterminatedString,
@@ -126,6 +123,8 @@ pub fn scan(source: &str) -> Result<Vec<Token>, ScanError> {
 }
 
 fn scan_ascii(source: &str) -> Result<Vec<Token>, Vec<TokenError>> {
+    assert!(source.is_ascii(), "expected ascii source");
+
     let keywords = HashMap::from([
         ("and".to_owned(),    TokenType::And),
         ("class".to_owned(),  TokenType::Class),
@@ -172,8 +171,13 @@ fn scan_ascii(source: &str) -> Result<Vec<Token>, Vec<TokenError>> {
     }
 }
 
-fn scan_ascii_line(line_num: u64, line: &str, keywords: &HashMap<String, TokenType>) -> Result<Vec<Token>, Vec<TokenError>> {
-    // let mut line = line.enumerate();
+fn scan_ascii_line(
+    line_num: u64,
+    line: &str,
+    keywords: &HashMap<String, TokenType>,
+) -> Result<Vec<Token>, Vec<TokenError>> {
+    assert!(line.is_ascii(), "expected ascii source");
+
     let mut chars = line.chars().enumerate().peekable();
 
     let mut token_result = Vec::new();
@@ -370,4 +374,79 @@ fn is_ascii_alpha(c: char) -> bool {
 
 fn is_ascii_alphanumeric(c: char) -> bool {
     is_ascii_alpha(c) || c.is_ascii_digit()
+}
+
+#[cfg(test)] 
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scan_non_ascii_fails() {
+        let source = "var x = ⊥";
+        matches!(scan(source), Err(ScanError::NonAsciiCharacterFound));
+    }
+
+    #[test]
+    fn scan_unterminated_string_fails() {
+        let source = "\"hello world";
+        assert!(scan(source).is_err());
+    }
+
+    #[test]
+    fn scan_two_line_string_fails() {
+        let source = "\"hello world\n\"";
+        assert!(scan(source).is_err());
+    }
+
+    #[test]
+    fn scan_unexpected_character_fails() {
+        let source = "^";
+        assert!(scan(source).is_err());
+    }
+
+    #[test]
+    fn scan_valid_tokens() {
+        let source = "
+            var x = 10;
+            var y = 20;
+            var z = nil;
+            if (x > y) {
+                z = x - y;
+            }
+            else {
+                z = x + y;
+            }
+            var w = x * y;
+
+            while (w > 0) {
+                w = w - 1;
+            }
+
+            class A {
+                fun f() { }
+            }
+        ";
+        assert!(scan(source).is_ok());
+    }
+
+    #[test]
+    fn scan_invalid_code_reports_correct_position() {
+        let source = "var x = 0;\nvar y = 2;\nx = x & y;";
+        let result = scan(source);
+
+        assert!(result.is_err());
+
+        if let Err(e) = result {
+            assert!(matches!(e, ScanError::TokenError(_)));
+
+            if let ScanError::TokenError(v) = e {
+                assert!(v.len() == 1);
+
+                let TokenError { line, column, error } = v[0];
+                assert!(line == 3);
+                assert!(column == 7);
+                assert!(error == TokenErrorType::UnexpectedCharacter);
+            }
+        }
+    }
 }

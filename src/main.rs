@@ -1,6 +1,6 @@
 mod error;
 
-use rlox::scanner::{scan, ScanError, Token};
+use rlox::scanner::scan;
 
 use std::{
     env, 
@@ -61,8 +61,4 @@ fn repl() -> Result<(), Error> {
     }
 
     Ok(())
-}
-
-fn run(line: &str) -> Result<(), Error> {
-    unimplemented!()
 }
