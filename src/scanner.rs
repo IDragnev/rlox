@@ -383,7 +383,7 @@ mod tests {
     #[test]
     fn scan_non_ascii_fails() {
         let source = "var x = ⊥";
-        matches!(scan(source), Err(ScanError::NonAsciiCharacterFound));
+        assert!(matches!(scan(source), Err(ScanError::NonAsciiCharacterFound)));
     }
 
     #[test]
