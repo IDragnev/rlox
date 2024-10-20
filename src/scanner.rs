@@ -60,13 +60,13 @@ pub enum Literal {
 
 #[derive(Clone, Debug)]
 pub struct Token {
-    token_type: TokenType,
-    lexeme: String,
-    literal: Option<Literal>,
+    pub token_type: TokenType,
+    pub lexeme: String,
+    pub literal: Option<Literal>,
 }
 
 impl Token {
-    fn single_character(token_type: TokenType, c: char) -> Self {
+    pub fn single_character(token_type: TokenType, c: char) -> Self {
         Token {
             token_type,
             lexeme: c.to_string(),
@@ -74,7 +74,7 @@ impl Token {
         }
     }
 
-    fn two_character(token_type: TokenType, c1: char, c2: char) -> Self {
+    pub fn two_character(token_type: TokenType, c1: char, c2: char) -> Self {
         let mut lexeme = c1.to_string();
         lexeme.push(c2);
 
