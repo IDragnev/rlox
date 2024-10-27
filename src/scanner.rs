@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
 };
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TokenType {
     // single-character tokens
     LeftParen,

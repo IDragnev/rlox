@@ -11,26 +11,26 @@ pub enum Literal {
 }
 
 pub struct Unary {
-    operator: Token,
-    right: Box<dyn Expr>,
+    pub operator: Token,
+    pub right: Box<dyn Expr>,
 }
 
 pub struct Binary {
-    left: Box<dyn Expr>,
-    right: Box<dyn Expr>,
-    operator: Token,
+    pub left: Box<dyn Expr>,
+    pub right: Box<dyn Expr>,
+    pub operator: Token,
 }
 
-pub struct Grouping(Box<dyn Expr>);
+pub struct Grouping(pub Box<dyn Expr>);
 
-trait Visitor<T> {
+pub trait Visitor<T> {
     fn visit_literal(&self, v: &Box<dyn Visitor<T>>, e: &Literal) -> T;
     fn visit_unary(&self, v: &Box<dyn Visitor<T>>, e: &Unary) -> T;
     fn visit_binary(&self, v: &Box<dyn Visitor<T>>, e: &Binary) -> T;
     fn visit_grouping(&self, v: &Box<dyn Visitor<T>>, e: &Grouping) -> T;
 }
 
-trait Expr {
+pub trait Expr {
     fn accept_string(&self, v: &Box<dyn Visitor<String>>) -> String;
 }
 
