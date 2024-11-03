@@ -44,7 +44,7 @@ impl Parser {
         let error_token = iter.next();
         if let Some(token) = error_token {
             if token.token_type == TokenType::Semicolon {
-                // expression end
+                // statement end
                 return;
             }
         }
@@ -59,11 +59,11 @@ impl Parser {
                 TokenType::Print |
                 TokenType::Class |
                 TokenType::Return => {
-                    // next expression reached
+                    // next statement reached
                     return;
                 },
                 TokenType::Semicolon => {
-                    // expression end
+                    // statement end
                     let _ = iter.next(); 
                     return;
                 },
