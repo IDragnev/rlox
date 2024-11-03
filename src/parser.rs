@@ -3,11 +3,12 @@ use crate::scanner::{
     TokenType,
 };
 use crate::expression::{
-    Expr,
     Binary,
+    Expr,
     Grouping,
     Literal,
-    Unary
+    Ternary,
+    Unary,
 };
 use std::iter::Peekable;
 use core::slice::Iter;
@@ -85,19 +86,64 @@ impl Parser {
         &self,
         iter: &mut Peekable<Iter<'_, Token>>,
     ) -> Result<Box<dyn Expr>, ParseError> {
-        let mut result = self.parse_equality(iter)?;
+        let mut result = self.parse_ternary(iter)?;
 
         while let Some(&token) = iter.peek() {
             match token.token_type {
                 TokenType::Comma => {
                     let operator = iter.next().unwrap().clone();
-                    let right = self.parse_equality(iter)?;
+                    let right = self.parse_ternary(iter)?;
                     let binary = Box::new(Binary {
                         left: result,
                         right,
                         operator,
                     });
                     result = binary;
+                },
+                _ => {
+                    break;
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    fn parse_ternary(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Expr>, ParseError> {
+        let mut result = self.parse_equality(iter)?;
+
+        while let Some(&token) = iter.peek() {
+            match token.token_type {
+                TokenType::QuestionMark => {
+                    let _question_mark = iter.next();
+
+                    let left = self.parse_equality(iter)?;
+                    if let Some(&token) = iter.peek() {
+                        if token.token_type == TokenType::Colon {
+                            let _colon = iter.next();
+                            let right = self.parse_ternary(iter)?;
+
+                            let ternary = Box::new(Ternary {
+                                cond: result,
+                                right,
+                                left,
+                            });
+                            result = ternary;
+                        }
+                        else {
+                            return Err(ParseError {
+                                error_type: ParseErrorType::ExpectedToken(TokenType::Colon),
+                            });
+                        }
+                    }
+                    else {
+                        return Err(ParseError {
+                            error_type: ParseErrorType::ExpectedToken(TokenType::Colon),
+                        });
+                    }
                 },
                 _ => {
                     break;

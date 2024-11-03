@@ -1,7 +1,10 @@
 mod error;
 
 use rlox::{
-    expression::Visitor,
+    expression::{
+        self,
+        Visitor,
+    },
     parser,
     scanner::scan
 };
@@ -15,8 +18,8 @@ use error::Error;
 struct PrintVisitor {}
 
 impl Visitor<String> for PrintVisitor {
-    fn visit_literal(&self, _: &Box<dyn Visitor<String>>, e: &rlox::expression::Literal) -> String {
-        use rlox::expression::Literal;
+    fn visit_literal(&self, _: &Box<dyn Visitor<String>>, e: &expression::Literal) -> String {
+        use expression::Literal;
 
         match e {
             Literal::Number(n) => n.to_string(),
@@ -27,14 +30,14 @@ impl Visitor<String> for PrintVisitor {
         }
     }
 
-    fn visit_unary(&self, v: &Box<dyn Visitor<String>>, e: &rlox::expression::Unary) -> String {
+    fn visit_unary(&self, v: &Box<dyn Visitor<String>>, e: &expression::Unary) -> String {
         format!("({} {})",
                 e.operator.lexeme,
                 e.right.accept_string(v),
         )
     }
 
-    fn visit_binary(&self, v: &Box<dyn Visitor<String>>, e: &rlox::expression::Binary) -> String {
+    fn visit_binary(&self, v: &Box<dyn Visitor<String>>, e: &expression::Binary) -> String {
         format!("({} {} {})",
                 e.operator.lexeme,
                 e.left.accept_string(v),
@@ -42,7 +45,15 @@ impl Visitor<String> for PrintVisitor {
         )
     }
 
-    fn visit_grouping(&self, v: &Box<dyn Visitor<String>>, e: &rlox::expression::Grouping) -> String {
+    fn visit_ternary(&self, v: &Box<dyn Visitor<String>>, e: &expression::Ternary) -> String {
+        format!("({} {} {})",
+                e.cond.accept_string(v),
+                e.left.accept_string(v),
+                e.right.accept_string(v),
+        )
+    }
+
+    fn visit_grouping(&self, v: &Box<dyn Visitor<String>>, e: &expression::Grouping) -> String {
         format!("(group {})", e.0.accept_string(v))
     }
 }
@@ -92,10 +103,9 @@ fn repl() -> Result<(), Error> {
         }
 
         println!("scanning...");
-
         match scan(&input) {
             Ok(tokens) => {
-                println!("tokens: {:#?}", tokens);
+                // println!("tokens: {:#?}", tokens);
                 println!("parsing...");
                 let parser = parser::Parser::new(&tokens);
                 match parser.parse() {
@@ -105,11 +115,11 @@ fn repl() -> Result<(), Error> {
                         println!("expr: {}", s);
                     },
                     Err(err) => {
-                        println!("error: {:?}", err);
+                        println!("parse error: {:?}", err);
                     }
                 }
             },
-            Err(e) => println!("{:?}", e),
+            Err(e) => println!("scan error: {:?}", e),
         }
     }
 

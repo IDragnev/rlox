@@ -21,12 +21,19 @@ pub struct Binary {
     pub operator: Token,
 }
 
+pub struct Ternary {
+    pub cond: Box<dyn Expr>,
+    pub left: Box<dyn Expr>,
+    pub right: Box<dyn Expr>,
+}
+
 pub struct Grouping(pub Box<dyn Expr>);
 
 pub trait Visitor<T> {
     fn visit_literal(&self, v: &Box<dyn Visitor<T>>, e: &Literal) -> T;
     fn visit_unary(&self, v: &Box<dyn Visitor<T>>, e: &Unary) -> T;
     fn visit_binary(&self, v: &Box<dyn Visitor<T>>, e: &Binary) -> T;
+    fn visit_ternary(&self, v: &Box<dyn Visitor<T>>, e: &Ternary) -> T;
     fn visit_grouping(&self, v: &Box<dyn Visitor<T>>, e: &Grouping) -> T;
 }
 
@@ -49,6 +56,12 @@ impl Expr for Unary {
 impl Expr for Binary {
     fn accept_string(&self, v: &Box<dyn Visitor<String>>) -> String {
         v.visit_binary(v, self)
+    }
+}
+
+impl Expr for Ternary {
+    fn accept_string(&self, v: &Box<dyn Visitor<String>>) -> String {
+        v.visit_ternary(v, self)
     }
 }
 
