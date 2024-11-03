@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
 };
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TokenType {
     // single-character tokens
     LeftParen,
@@ -14,6 +14,8 @@ pub enum TokenType {
     Minus,
     Plus,
     Semicolon,
+    Colon,
+    QuestionMark,
     Slash,
     Star,
 
@@ -225,6 +227,12 @@ fn scan_ascii_line(
             },
             ';' => {
                 push_token(Token::single_character(TokenType::Semicolon, c))
+            },
+            ':' => {
+                push_token(Token::single_character(TokenType::Colon, c))
+            },
+            '?' => {
+                push_token(Token::single_character(TokenType::QuestionMark, c))
             },
             '*' => {
                 push_token(Token::single_character(TokenType::Star, c))
