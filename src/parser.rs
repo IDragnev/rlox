@@ -78,7 +78,34 @@ impl Parser {
         &self,
         iter: &mut Peekable<Iter<'_, Token>>,
     ) -> Result<Box<dyn Expr>, ParseError> {
-        self.parse_equality(iter)
+        self.parse_comma_separated(iter)
+    }
+
+    fn parse_comma_separated(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Expr>, ParseError> {
+        let mut result = self.parse_equality(iter)?;
+
+        while let Some(&token) = iter.peek() {
+            match token.token_type {
+                TokenType::Comma => {
+                    let operator = iter.next().unwrap().clone();
+                    let right = self.parse_equality(iter)?;
+                    let binary = Box::new(Binary {
+                        left: result,
+                        right,
+                        operator,
+                    });
+                    result = binary;
+                },
+                _ => {
+                    break;
+                }
+            }
+        }
+
+        Ok(result)
     }
 
     fn parse_equality(
