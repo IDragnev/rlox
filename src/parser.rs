@@ -13,7 +13,15 @@ use std::iter::Peekable;
 use core::slice::Iter;
 
 #[derive(Clone, Debug)]
+pub enum ParseErrorType {
+    ExpectedToken(TokenType),
+    ExpectedExpression,
+}
+
+#[derive(Clone, Debug)]
 pub struct ParseError {
+    error_type: ParseErrorType,
+    // to do - add error location info
 }
 
 pub struct Parser {
@@ -30,6 +38,40 @@ impl Parser {
     pub fn parse(&self) -> Result<Box<dyn Expr>, ParseError> {
         let mut iter = self.tokens.iter().peekable();
         self.parse_expr(&mut iter)
+    }
+
+    fn synchronize(iter: &mut Peekable<Iter<'_, Token>>) {
+        let error_token = iter.next();
+        if let Some(token) = error_token {
+            if token.token_type == TokenType::Semicolon {
+                // expression end
+                return;
+            }
+        }
+
+        while let Some(&token) = iter.peek() {
+            match token.token_type {
+                TokenType::If |
+                TokenType::Fun |
+                TokenType::Var |
+                TokenType::For |
+                TokenType::While |
+                TokenType::Print |
+                TokenType::Class |
+                TokenType::Return => {
+                    // next expression reached
+                    return;
+                },
+                TokenType::Semicolon => {
+                    // expression end
+                    let _ = iter.next(); 
+                    return;
+                },
+                _ => {
+                    let _ = iter.next(); 
+                },
+            }
+        }
     }
 
     fn parse_expr(
@@ -196,7 +238,7 @@ impl Parser {
                         return Ok(Box::new(Literal::String(s)));
                     }
                     else {
-                        // what do we do? Should not happen
+                        panic!("Expected string literal");
                     }
                 },
                 TokenType::Number => {
@@ -205,7 +247,7 @@ impl Parser {
                         return Ok(Box::new(Literal::Number(n)));
                     }
                     else {
-                        // what do we do? Should not happen
+                        panic!("Expected number literal");
                     }
                 },
                 TokenType::LeftParen => {
@@ -216,21 +258,27 @@ impl Parser {
                             return Ok(Box::new(Grouping(nested)));
                         }
                         else {
-                            // expected ')'    
+                            return Err(ParseError {
+                                error_type: ParseErrorType::ExpectedToken(TokenType::RightParen),
+                            });
                         }
                     }
                     else {
-                        // expected ')'
+                        return Err(ParseError {
+                            error_type: ParseErrorType::ExpectedToken(TokenType::RightParen),
+                        });
                     }
                 },
                 _ => {
-                    // expected expression
+                    return Err(ParseError {
+                        error_type: ParseErrorType::ExpectedExpression
+                    });
                 }
             }
         }
 
-        // expected expression
-        Err(ParseError{})
+        return Err(ParseError {
+            error_type: ParseErrorType::ExpectedExpression
+        });
     }
-
 }
