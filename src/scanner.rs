@@ -429,6 +429,9 @@ mod tests {
             while (w > 0) {
                 w = w - 1;
             }
+        
+            var tern = (1 * 10 > 10) ? true : nil;
+            var comma = 1, 2, (5 + 3);
 
             class A {
                 fun f() { }
