@@ -1,6 +1,10 @@
 
 use std::boxed::Box;
 use crate::scanner::Token;
+use crate::eval::{
+    RuntimeValue,
+    RuntimeError,
+};
 
 pub enum Literal {
     Number(f64),
@@ -39,10 +43,14 @@ pub trait Visitor<T> {
 
 pub trait Expr {
     fn accept_string(&self, v: &Box<dyn Visitor<String>>) -> String;
+    fn accept_rt_value(&self, v: &Box<dyn Visitor<Result<RuntimeValue, RuntimeError>>>) -> Result<RuntimeValue, RuntimeError>;
 }
 
 impl Expr for Literal {
     fn accept_string(&self, v: &Box<dyn Visitor<String>>) -> String {
+        v.visit_literal(v, self)
+    }
+    fn accept_rt_value(&self, v: &Box<dyn Visitor<Result<RuntimeValue, RuntimeError>>>) -> Result<RuntimeValue, RuntimeError> {
         v.visit_literal(v, self)
     }
 }
@@ -51,10 +59,16 @@ impl Expr for Unary {
     fn accept_string(&self, v: &Box<dyn Visitor<String>>) -> String {
         v.visit_unary(v, self)
     }
+    fn accept_rt_value(&self, v: &Box<dyn Visitor<Result<RuntimeValue, RuntimeError>>>) -> Result<RuntimeValue, RuntimeError> {
+        v.visit_unary(v, self)
+    }
 }
 
 impl Expr for Binary {
     fn accept_string(&self, v: &Box<dyn Visitor<String>>) -> String {
+        v.visit_binary(v, self)
+    }
+    fn accept_rt_value(&self, v: &Box<dyn Visitor<Result<RuntimeValue, RuntimeError>>>) -> Result<RuntimeValue, RuntimeError> {
         v.visit_binary(v, self)
     }
 }
@@ -63,10 +77,16 @@ impl Expr for Ternary {
     fn accept_string(&self, v: &Box<dyn Visitor<String>>) -> String {
         v.visit_ternary(v, self)
     }
+    fn accept_rt_value(&self, v: &Box<dyn Visitor<Result<RuntimeValue, RuntimeError>>>) -> Result<RuntimeValue, RuntimeError> {
+        v.visit_ternary(v, self)
+    }
 }
 
 impl Expr for Grouping {
     fn accept_string(&self, v: &Box<dyn Visitor<String>>) -> String {
+        v.visit_grouping(v, self)
+    }
+    fn accept_rt_value(&self, v: &Box<dyn Visitor<Result<RuntimeValue, RuntimeError>>>) -> Result<RuntimeValue, RuntimeError> {
         v.visit_grouping(v, self)
     }
 }

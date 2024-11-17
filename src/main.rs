@@ -1,12 +1,12 @@
 mod error;
 
 use rlox::{
-    expression::{
-        self,
-        Visitor,
+    eval::{
+        ExprEvalVisitor, RuntimeError, RuntimeValue
     },
+    expression::Visitor,
     parser,
-    scanner::scan
+    scanner::scan,
 };
 use std::{
     env, 
@@ -14,49 +14,6 @@ use std::{
 };
 
 use error::Error;
-
-struct PrintVisitor {}
-
-impl Visitor<String> for PrintVisitor {
-    fn visit_literal(&self, _: &Box<dyn Visitor<String>>, e: &expression::Literal) -> String {
-        use expression::Literal;
-
-        match e {
-            Literal::Number(n) => n.to_string(),
-            Literal::String(s) => s.clone(),
-            Literal::True => "true".to_owned(),
-            Literal::False => "false".to_owned(),
-            Literal::Nil => "nil".to_owned(),
-        }
-    }
-
-    fn visit_unary(&self, v: &Box<dyn Visitor<String>>, e: &expression::Unary) -> String {
-        format!("({} {})",
-                e.operator.lexeme,
-                e.right.accept_string(v),
-        )
-    }
-
-    fn visit_binary(&self, v: &Box<dyn Visitor<String>>, e: &expression::Binary) -> String {
-        format!("({} {} {})",
-                e.operator.lexeme,
-                e.left.accept_string(v),
-                e.right.accept_string(v),
-        )
-    }
-
-    fn visit_ternary(&self, v: &Box<dyn Visitor<String>>, e: &expression::Ternary) -> String {
-        format!("({} {} {})",
-                e.cond.accept_string(v),
-                e.left.accept_string(v),
-                e.right.accept_string(v),
-        )
-    }
-
-    fn visit_grouping(&self, v: &Box<dyn Visitor<String>>, e: &expression::Grouping) -> String {
-        format!("(group {})", e.0.accept_string(v))
-    }
-}
 
 fn main() -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();
@@ -102,17 +59,20 @@ fn repl() -> Result<(), Error> {
             break;
         }
 
-        println!("scanning...");
         match scan(&input) {
             Ok(tokens) => {
-                // println!("tokens: {:#?}", tokens);
-                println!("parsing...");
                 let parser = parser::Parser::new(&tokens);
                 match parser.parse() {
                     Ok(expr) => {
-                        let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
-                        let s = expr.accept_string(&visitor);
-                        println!("expr: {}", s);
+                        let visitor: Box<dyn Visitor<Result<RuntimeValue, RuntimeError>>> = Box::new(ExprEvalVisitor{});
+                        let val = expr.accept_rt_value(&visitor);
+                        match val {
+                            Ok(v) => {
+                                let s = stringify(&v);
+                                println!("{}", s);
+                            },
+                            Err(e) => println!("runtime error: {:#?}", e),
+                        };
                     },
                     Err(err) => {
                         println!("parse error: {:?}", err);
@@ -124,4 +84,13 @@ fn repl() -> Result<(), Error> {
     }
 
     Ok(())
+}
+
+fn stringify(val: &RuntimeValue) -> String {
+    match val {
+        RuntimeValue::Nil => "nil".to_owned(),
+        RuntimeValue::Number(n) => n.to_string(),
+        RuntimeValue::Bool(b) => b.to_string(),
+        RuntimeValue::String(s) => format!("\"{}\"", s),
+    }
 }
