@@ -23,6 +23,7 @@ pub enum RuntimeError {
     UnaryMinusExpectsNumber(Token),
     BinaryOperatorExpectsNumbers(Token),
     BinaryPlusExpectsTwoNumbersOrTwoStrings(Token),
+    DivisionByZero(Token),
 }
 
 type EvalResult = Result<RuntimeValue, RuntimeError>;
@@ -109,11 +110,23 @@ impl Visitor<EvalResult> for ExprEvalVisitor {
             TokenType::Star => {
                 eval_bin_num_operator(&left, &right, |a, b| RuntimeValue::Number(a * b), &e.operator)
             },
-            TokenType::Slash => {
-                eval_bin_num_operator(&left, &right, |a, b| RuntimeValue::Number(a / b), &e.operator)
-            },
             TokenType::Minus => {
                 eval_bin_num_operator(&left, &right, |a, b| RuntimeValue::Number(a - b), &e.operator)
+            },
+            TokenType::Slash => {
+                match (&left, &right) {
+                    (RuntimeValue::Number(a), RuntimeValue::Number(b)) => {
+                        if *b == 0_f64 {
+                            Err(RuntimeError::DivisionByZero(e.operator.clone()))
+                        }
+                        else {
+                            Ok(RuntimeValue::Number(a / b))
+                        }
+                    },
+                    _ => {
+                        Err(RuntimeError::BinaryOperatorExpectsNumbers(e.operator.clone()))
+                    },
+                }
             },
             TokenType::Plus => {
                 match (&left, &right) {
