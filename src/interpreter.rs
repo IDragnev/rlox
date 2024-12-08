@@ -2,21 +2,17 @@ use crate::{
     eval::{
         ExprEvalVisitor,
         RuntimeValue,
-        RuntimeError,
      },
     expression,
     statement,
 };
 
 pub struct Interpreter {
-    // no need for box when expr::Visitor is done properly -> directly ExprEvalVisitor
-    expr_evaluator: Box<dyn expression::Visitor<Result<RuntimeValue, RuntimeError>>>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Interpreter {
-            expr_evaluator: Box::new(ExprEvalVisitor {})
         }
     }
 
@@ -27,7 +23,8 @@ impl Interpreter {
     }
 
     fn evaluate_expr(&self, expr: &Box<dyn expression::Expr>) -> Option<RuntimeValue> {
-        match expr.accept_rt_value(&self.expr_evaluator) {
+        let eval_visitor = ExprEvalVisitor{};
+        match expr.accept_rt_value(&eval_visitor) {
             Ok(v) => Some(v),
             Err(rt_err) => {
                 println!("runtime error: {:?}", rt_err);

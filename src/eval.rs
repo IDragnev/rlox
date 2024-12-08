@@ -33,7 +33,6 @@ pub struct ExprEvalVisitor {}
 impl Visitor<EvalResult> for ExprEvalVisitor {
     fn visit_literal(
         &self,
-        _: &Box<dyn Visitor<EvalResult>>,
         e: &expression::Literal,
     ) -> EvalResult {
         use expression::Literal as EL;
@@ -51,10 +50,9 @@ impl Visitor<EvalResult> for ExprEvalVisitor {
 
     fn visit_unary(
         &self,
-        v: &Box<dyn Visitor<EvalResult>>,
         e: &expression::Unary,
     ) -> EvalResult {
-        let value = e.right.accept_rt_value(v)?;
+        let value = e.right.accept_rt_value(self)?;
 
         match e.operator.token_type {
             TokenType::Minus => {
@@ -78,11 +76,10 @@ impl Visitor<EvalResult> for ExprEvalVisitor {
 
     fn visit_binary(
         &self,
-        v: &Box<dyn Visitor<EvalResult>>,
         e: &expression::Binary,
     ) -> EvalResult {
-        let left = e.left.accept_rt_value(v)?;
-        let right = e.right.accept_rt_value(v)?;
+        let left = e.left.accept_rt_value(self)?;
+        let right = e.right.accept_rt_value(self)?;
 
         match e.operator.token_type {
             TokenType::EqualEqual => {
@@ -154,24 +151,22 @@ impl Visitor<EvalResult> for ExprEvalVisitor {
 
     fn visit_ternary(
         &self,
-        v: &Box<dyn Visitor<EvalResult>>,
         e: &expression::Ternary,
     ) -> EvalResult {
-        let cond = e.cond.accept_rt_value(v)?;
+        let cond = e.cond.accept_rt_value(self)?;
         if is_truthy(&cond) {
-            e.left.accept_rt_value(v)
+            e.left.accept_rt_value(self)
         }
         else {
-            e.right.accept_rt_value(v)
+            e.right.accept_rt_value(self)
         }
     }
 
     fn visit_grouping(
         &self,
-        v: &Box<dyn Visitor<EvalResult>>,
         e: &expression::Grouping,
     ) -> EvalResult {
-        e.0.accept_rt_value(v)
+        e.0.accept_rt_value(self)
     }
 }
 

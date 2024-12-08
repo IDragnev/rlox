@@ -34,59 +34,61 @@ pub struct Ternary {
 pub struct Grouping(pub Box<dyn Expr>);
 
 pub trait Visitor<T> {
-    fn visit_literal(&self, v: &Box<dyn Visitor<T>>, e: &Literal) -> T;
-    fn visit_unary(&self, v: &Box<dyn Visitor<T>>, e: &Unary) -> T;
-    fn visit_binary(&self, v: &Box<dyn Visitor<T>>, e: &Binary) -> T;
-    fn visit_ternary(&self, v: &Box<dyn Visitor<T>>, e: &Ternary) -> T;
-    fn visit_grouping(&self, v: &Box<dyn Visitor<T>>, e: &Grouping) -> T;
+    fn visit_literal(&self, e: &Literal) -> T;
+    fn visit_unary(&self, e: &Unary) -> T;
+    fn visit_binary(&self, e: &Binary) -> T;
+    fn visit_ternary(&self, e: &Ternary) -> T;
+    fn visit_grouping(&self, e: &Grouping) -> T;
 }
 
+type RuntimeResult = Result<RuntimeValue, RuntimeError>;
+
 pub trait Expr {
-    fn accept_string(&self, v: &Box<dyn Visitor<String>>) -> String;
-    fn accept_rt_value(&self, v: &Box<dyn Visitor<Result<RuntimeValue, RuntimeError>>>) -> Result<RuntimeValue, RuntimeError>;
+    fn accept_string(&self, v: &dyn Visitor<String>) -> String;
+    fn accept_rt_value(&self, v: &dyn Visitor<RuntimeResult>) -> RuntimeResult;
 }
 
 impl Expr for Literal {
-    fn accept_string(&self, v: &Box<dyn Visitor<String>>) -> String {
-        v.visit_literal(v, self)
+    fn accept_string(&self, v: &dyn Visitor<String>) -> String {
+        v.visit_literal(self)
     }
-    fn accept_rt_value(&self, v: &Box<dyn Visitor<Result<RuntimeValue, RuntimeError>>>) -> Result<RuntimeValue, RuntimeError> {
-        v.visit_literal(v, self)
+    fn accept_rt_value(&self, v: &dyn Visitor<RuntimeResult>) -> RuntimeResult {
+        v.visit_literal(self)
     }
 }
 
 impl Expr for Unary {
-    fn accept_string(&self, v: &Box<dyn Visitor<String>>) -> String {
-        v.visit_unary(v, self)
+    fn accept_string(&self, v: &dyn Visitor<String>) -> String {
+        v.visit_unary(self)
     }
-    fn accept_rt_value(&self, v: &Box<dyn Visitor<Result<RuntimeValue, RuntimeError>>>) -> Result<RuntimeValue, RuntimeError> {
-        v.visit_unary(v, self)
+    fn accept_rt_value(&self, v: &dyn Visitor<RuntimeResult>) -> RuntimeResult {
+        v.visit_unary(self)
     }
 }
 
 impl Expr for Binary {
-    fn accept_string(&self, v: &Box<dyn Visitor<String>>) -> String {
-        v.visit_binary(v, self)
+    fn accept_string(&self, v: &dyn Visitor<String>) -> String {
+        v.visit_binary(self)
     }
-    fn accept_rt_value(&self, v: &Box<dyn Visitor<Result<RuntimeValue, RuntimeError>>>) -> Result<RuntimeValue, RuntimeError> {
-        v.visit_binary(v, self)
+    fn accept_rt_value(&self, v: &dyn Visitor<RuntimeResult>) -> RuntimeResult {
+        v.visit_binary(self)
     }
 }
 
 impl Expr for Ternary {
-    fn accept_string(&self, v: &Box<dyn Visitor<String>>) -> String {
-        v.visit_ternary(v, self)
+    fn accept_string(&self, v: &dyn Visitor<String>) -> String {
+        v.visit_ternary(self)
     }
-    fn accept_rt_value(&self, v: &Box<dyn Visitor<Result<RuntimeValue, RuntimeError>>>) -> Result<RuntimeValue, RuntimeError> {
-        v.visit_ternary(v, self)
+    fn accept_rt_value(&self, v: &dyn Visitor<RuntimeResult>) -> RuntimeResult {
+        v.visit_ternary(self)
     }
 }
 
 impl Expr for Grouping {
-    fn accept_string(&self, v: &Box<dyn Visitor<String>>) -> String {
-        v.visit_grouping(v, self)
+    fn accept_string(&self, v: &dyn Visitor<String>) -> String {
+        v.visit_grouping(self)
     }
-    fn accept_rt_value(&self, v: &Box<dyn Visitor<Result<RuntimeValue, RuntimeError>>>) -> Result<RuntimeValue, RuntimeError> {
-        v.visit_grouping(v, self)
+    fn accept_rt_value(&self, v: &dyn Visitor<RuntimeResult>) -> RuntimeResult {
+        v.visit_grouping(self)
     }
 }

@@ -465,7 +465,7 @@ mod tests {
     struct PrintVisitor {}
 
     impl Visitor<String> for PrintVisitor {
-        fn visit_literal(&self, _: &Box<dyn Visitor<String>>, e: &expression::Literal) -> String {
+        fn visit_literal(&self, e: &expression::Literal) -> String {
             use expression::Literal;
 
             match e {
@@ -477,31 +477,31 @@ mod tests {
             }
         }
 
-        fn visit_unary(&self, v: &Box<dyn Visitor<String>>, e: &expression::Unary) -> String {
+        fn visit_unary(&self, e: &expression::Unary) -> String {
             format!("({} {})",
                     e.operator.lexeme,
-                    e.right.accept_string(v),
+                    e.right.accept_string(self),
             )
         }
 
-        fn visit_binary(&self, v: &Box<dyn Visitor<String>>, e: &expression::Binary) -> String {
+        fn visit_binary(&self, e: &expression::Binary) -> String {
             format!("({} {} {})",
                     e.operator.lexeme,
-                    e.left.accept_string(v),
-                    e.right.accept_string(v),
+                    e.left.accept_string(self),
+                    e.right.accept_string(self),
             )
         }
 
-        fn visit_ternary(&self, v: &Box<dyn Visitor<String>>, e: &expression::Ternary) -> String {
+        fn visit_ternary(&self, e: &expression::Ternary) -> String {
             format!("({} {} {})",
-                    e.cond.accept_string(v),
-                    e.left.accept_string(v),
-                    e.right.accept_string(v),
+                    e.cond.accept_string(self),
+                    e.left.accept_string(self),
+                    e.right.accept_string(self),
             )
         }
 
-        fn visit_grouping(&self, v: &Box<dyn Visitor<String>>, e: &expression::Grouping) -> String {
-            format!("(group {})", e.0.accept_string(v))
+        fn visit_grouping(&self, e: &expression::Grouping) -> String {
+            format!("(group {})", e.0.accept_string(self))
         }
     }
 
@@ -525,117 +525,108 @@ mod tests {
 
     #[test]
     fn parse_comma_separated_primary_expressions() {
-        let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
         let parser = Parser::new(&scan("nil,12.5,\"str\",true,false").unwrap());
         let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&visitor);
+            let str = expr.unwrap().accept_string(&PrintVisitor{});
             assert_eq!(str, "(, (, (, (, nil 12.5) str) true) false)");
         }
     }
 
     #[test]
     fn parse_grouping() {
-        let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
         let parser = Parser::new(&scan("(nil)").unwrap());
         let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&visitor);
+            let str = expr.unwrap().accept_string(&PrintVisitor{});
             assert_eq!(str, "(group nil)");
         }
     }
 
     #[test]
     fn parse_unary() {
-        let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
         let parser = Parser::new(&scan("---12.5").unwrap());
         let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&visitor);
+            let str = expr.unwrap().accept_string(&PrintVisitor{});
             assert_eq!(str, "(- (- (- 12.5)))");
         }
     }
 
     #[test]
     fn parse_factor() {
-        let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
         let parser = Parser::new(&scan("2 * 3 / -2").unwrap());
         let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&visitor);
+            let str = expr.unwrap().accept_string(&PrintVisitor{});
             assert_eq!(str, "(/ (* 2 3) (- 2))");
         }
     }
 
     #[test]
     fn parse_term() {
-        let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
         let parser = Parser::new(&scan("2 - 3 + 5 * -2").unwrap());
         let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&visitor);
+            let str = expr.unwrap().accept_string(&PrintVisitor{});
             assert_eq!(str, "(+ (- 2 3) (* 5 (- 2)))");
         }
     }
 
     #[test]
     fn parse_comparison() {
-        let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
         let parser = Parser::new(&scan("2 > 3 * 2 - 10").unwrap());
         let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&visitor);
+            let str = expr.unwrap().accept_string(&PrintVisitor{});
             assert_eq!(str, "(> 2 (- (* 3 2) 10))");
         }
     }
 
     #[test]
     fn parse_equality() {
-        let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
         let parser = Parser::new(&scan("2 > 3 * 2 - 10 == false").unwrap());
         let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&visitor);
+            let str = expr.unwrap().accept_string(&PrintVisitor{});
             assert_eq!(str, "(== (> 2 (- (* 3 2) 10)) false)");
         }
     }
 
     #[test]
     fn parse_ternary() {
-        let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
         let parser = Parser::new(&scan("5 > 2 ? 1 + 3 : 2 * 4").unwrap());
         let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&visitor);
+            let str = expr.unwrap().accept_string(&PrintVisitor{});
             assert_eq!(str, "((> 5 2) (+ 1 3) (* 2 4))");
         }
     }
 
     #[test]
     fn parse_nested_ternary() {
-        let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
         let parser = Parser::new(&scan("true ? true : false ? true : true ? true : false").unwrap());
         let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&visitor);
+            let str = expr.unwrap().accept_string(&PrintVisitor{});
             assert_eq!(str, "(true true (false true (true true false)))");
         }
     }
