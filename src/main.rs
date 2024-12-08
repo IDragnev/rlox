@@ -1,11 +1,8 @@
 mod error;
 
 use rlox::{
-    eval::{
-        ExprEvalVisitor, RuntimeError, RuntimeValue
-    },
-    expression::Visitor,
-    parser,
+    interpreter::Interpreter,
+    parser::Parser,
     scanner::scan,
 };
 use std::{
@@ -35,21 +32,24 @@ fn main() -> Result<(), Error> {
     //     println!("{}", contents);
     // }
 
+    // if runtime error in file mode, exit with code=70
     Ok(())
 }
 
-fn read_file(filename: &PathBuf) -> Result<String, Error> {
-    use std::fs::File;
-    use std::io::prelude::*;
+// fn read_file(filename: &PathBuf) -> Result<String, Error> {
+//     use std::fs::File;
+//     use std::io::prelude::*;
 
-    let mut file = File::open(filename)?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
+//     let mut file = File::open(filename)?;
+//     let mut contents = String::new();
+//     file.read_to_string(&mut contents)?;
 
-    Ok(contents)
-}
+//     Ok(contents)
+// }
 
 fn repl() -> Result<(), Error> {
+    let mut interp = Interpreter::new();
+
     loop {
         let mut input = String::new();
         std::io::stdin().read_line(&mut input)?;
@@ -61,21 +61,13 @@ fn repl() -> Result<(), Error> {
 
         match scan(&input) {
             Ok(tokens) => {
-                let parser = parser::Parser::new(&tokens);
+                let parser = Parser::new(&tokens);
                 match parser.parse() {
-                    Ok(expr) => {
-                        let visitor: Box<dyn Visitor<Result<RuntimeValue, RuntimeError>>> = Box::new(ExprEvalVisitor{});
-                        let val = expr.accept_rt_value(&visitor);
-                        match val {
-                            Ok(v) => {
-                                let s = stringify(&v);
-                                println!("{}", s);
-                            },
-                            Err(e) => println!("runtime error: {:#?}", e),
-                        };
+                    Ok(statements) => {
+                        interp.interpret_statements(&statements);
                     },
-                    Err(err) => {
-                        println!("parse error: {:?}", err);
+                    Err(errs) => {
+                        println!("parse error: {:?}", errs);
                     }
                 }
             },
@@ -84,13 +76,4 @@ fn repl() -> Result<(), Error> {
     }
 
     Ok(())
-}
-
-fn stringify(val: &RuntimeValue) -> String {
-    match val {
-        RuntimeValue::Nil => "nil".to_owned(),
-        RuntimeValue::Number(n) => n.to_string(),
-        RuntimeValue::Bool(b) => b.to_string(),
-        RuntimeValue::String(s) => format!("\"{}\"", s),
-    }
 }

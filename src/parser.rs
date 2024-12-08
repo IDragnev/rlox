@@ -10,6 +10,7 @@ use crate::expression::{
     Ternary,
     Unary,
 };
+use crate::statement::{self, Stmt};
 use std::iter::Peekable;
 use core::slice::Iter;
 
@@ -17,6 +18,8 @@ use core::slice::Iter;
 pub enum ParseErrorType {
     ExpectedToken(TokenType),
     ExpectedExpression,
+    ExpectedSemicolon,
+    ExpectedStatement,
 }
 
 #[derive(Clone, Debug)]
@@ -36,43 +39,84 @@ impl Parser {
         }
     }
 
-    pub fn parse(&self) -> Result<Box<dyn Expr>, ParseError> {
+    pub fn parse(&self) -> Result<Vec<Box<dyn Stmt>>, Vec<ParseError>> {
+        let mut iter = self.tokens.iter().peekable();
+
+        let mut errors = vec![];
+        let mut statements = vec![];
+
+        loop {
+            if let None = iter.peek() {
+                break;
+            }
+
+            match self.parse_statement(&mut iter) {
+                Ok(stmt) => {
+                    if errors.len() == 0 {
+                        statements.push(stmt);
+                    }
+                },
+                Err(e) => {
+                    errors.push(e);
+                    synchronize(&mut iter);
+                }
+            }
+        }
+
+        if errors.len() > 0 {
+            Err(errors)
+        }
+        else {
+            Ok(statements)
+        }
+    }
+
+    #[cfg(test)] 
+    fn parse_single_expr(&self) -> Result<Box<dyn Expr>, ParseError> {
         let mut iter = self.tokens.iter().peekable();
         self.parse_expr(&mut iter)
     }
 
-    fn synchronize(iter: &mut Peekable<Iter<'_, Token>>) {
-        let error_token = iter.next();
-        if let Some(token) = error_token {
-            if token.token_type == TokenType::Semicolon {
-                // statement end
-                return;
-            }
-        }
-
-        while let Some(&token) = iter.peek() {
+    fn parse_statement(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Stmt>, ParseError> {
+        if let Some(&token) = iter.peek() {
             match token.token_type {
-                TokenType::If |
-                TokenType::Fun |
-                TokenType::Var |
-                TokenType::For |
-                TokenType::While |
-                TokenType::Print |
-                TokenType::Class |
-                TokenType::Return => {
-                    // next statement reached
-                    return;
-                },
-                TokenType::Semicolon => {
-                    // statement end
-                    let _ = iter.next(); 
-                    return;
-                },
-                _ => {
-                    let _ = iter.next(); 
-                },
+                TokenType::Print => self.parse_print_statement(iter),
+                _ => self.parse_expr_statement(iter),
             }
         }
+        else {
+            Err(ParseError {
+                error_type: ParseErrorType::ExpectedStatement
+            })
+        }
+    }
+
+    fn parse_print_statement(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Stmt>, ParseError> {
+        let _print = iter.next();
+        let expr = self.parse_expr(iter)?;
+        let _ = self.consume_token(iter, TokenType::Semicolon, ParseErrorType::ExpectedSemicolon)?;
+
+        Ok(Box::new(statement::Print{
+            expr,
+        }))
+    }
+
+    fn parse_expr_statement(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Stmt>, ParseError> {
+        let expr = self.parse_expr(iter)?;
+        let _ = self.consume_token(iter, TokenType::Semicolon, ParseErrorType::ExpectedSemicolon)?;
+
+        Ok(Box::new(statement::Expression{
+            expr,
+        }))
     }
 
     fn parse_expr(
@@ -354,6 +398,54 @@ impl Parser {
             error_type: ParseErrorType::ExpectedExpression
         });
     }
+
+    fn consume_token(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+        t: TokenType,
+        err: ParseErrorType,
+    ) -> Result<Token, ParseError> {
+        if let Some(token) = iter.next_if(|token| token.token_type == t) {
+            Ok(token.clone())
+        }
+        else {
+            Err(ParseError { error_type: err })
+        }
+    }
+}
+
+fn synchronize(iter: &mut Peekable<Iter<'_, Token>>) {
+    let error_token = iter.next();
+    if let Some(token) = error_token {
+        if token.token_type == TokenType::Semicolon {
+            // statement end
+            return;
+        }
+    }
+
+    while let Some(&token) = iter.peek() {
+        match token.token_type {
+            TokenType::If |
+            TokenType::Fun |
+            TokenType::Var |
+            TokenType::For |
+            TokenType::While |
+            TokenType::Print |
+            TokenType::Class |
+            TokenType::Return => {
+                // next statement reached
+                return;
+            },
+            TokenType::Semicolon => {
+                // statement end
+                let _ = iter.next(); 
+                return;
+            },
+            _ => {
+                let _ = iter.next(); 
+            },
+        }
+    }
 }
 
 #[cfg(test)] 
@@ -435,7 +527,7 @@ mod tests {
     fn parse_comma_separated_primary_expressions() {
         let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
         let parser = Parser::new(&scan("nil,12.5,\"str\",true,false").unwrap());
-        let expr = parser.parse();
+        let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
@@ -448,7 +540,7 @@ mod tests {
     fn parse_grouping() {
         let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
         let parser = Parser::new(&scan("(nil)").unwrap());
-        let expr = parser.parse();
+        let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
@@ -461,7 +553,7 @@ mod tests {
     fn parse_unary() {
         let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
         let parser = Parser::new(&scan("---12.5").unwrap());
-        let expr = parser.parse();
+        let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
@@ -474,7 +566,7 @@ mod tests {
     fn parse_factor() {
         let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
         let parser = Parser::new(&scan("2 * 3 / -2").unwrap());
-        let expr = parser.parse();
+        let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
@@ -487,7 +579,7 @@ mod tests {
     fn parse_term() {
         let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
         let parser = Parser::new(&scan("2 - 3 + 5 * -2").unwrap());
-        let expr = parser.parse();
+        let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
@@ -500,7 +592,7 @@ mod tests {
     fn parse_comparison() {
         let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
         let parser = Parser::new(&scan("2 > 3 * 2 - 10").unwrap());
-        let expr = parser.parse();
+        let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
@@ -513,7 +605,7 @@ mod tests {
     fn parse_equality() {
         let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
         let parser = Parser::new(&scan("2 > 3 * 2 - 10 == false").unwrap());
-        let expr = parser.parse();
+        let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
@@ -526,7 +618,7 @@ mod tests {
     fn parse_ternary() {
         let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
         let parser = Parser::new(&scan("5 > 2 ? 1 + 3 : 2 * 4").unwrap());
-        let expr = parser.parse();
+        let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
@@ -539,7 +631,7 @@ mod tests {
     fn parse_nested_ternary() {
         let visitor: Box<dyn Visitor<String>> = Box::new(PrintVisitor{});
         let parser = Parser::new(&scan("true ? true : false ? true : true ? true : false").unwrap());
-        let expr = parser.parse();
+        let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
