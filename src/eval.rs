@@ -28,7 +28,11 @@ pub enum RuntimeError {
 
 type EvalResult = Result<RuntimeValue, RuntimeError>;
 
-pub struct ExprEvalVisitor {}
+pub fn evaluate(expr: &Box<dyn expression::Expr>) -> EvalResult {
+    expr.accept_rt_value(&ExprEvalVisitor{})
+}
+
+struct ExprEvalVisitor {}
 
 impl Visitor<EvalResult> for ExprEvalVisitor {
     fn visit_literal(

@@ -1,7 +1,6 @@
 use crate::{
     eval::{
-        ExprEvalVisitor,
-        RuntimeValue,
+        self, RuntimeValue
      },
     expression,
     statement,
@@ -23,8 +22,7 @@ impl Interpreter {
     }
 
     fn evaluate_expr(&self, expr: &Box<dyn expression::Expr>) -> Option<RuntimeValue> {
-        let eval_visitor = ExprEvalVisitor{};
-        match expr.accept_rt_value(&eval_visitor) {
+        match eval::evaluate(expr) {
             Ok(v) => Some(v),
             Err(rt_err) => {
                 println!("runtime error: {:?}", rt_err);
@@ -46,9 +44,7 @@ impl statement::Visitor<()> for Interpreter {
     }
 }
 
-fn stringify(val: &crate::eval::RuntimeValue) -> String {
-    use crate::eval::RuntimeValue;
-
+fn stringify(val: &RuntimeValue) -> String {
     match val {
         RuntimeValue::Nil => "nil".to_owned(),
         RuntimeValue::Number(n) => n.to_string(),
