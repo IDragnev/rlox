@@ -33,12 +33,17 @@ pub struct Ternary {
 
 pub struct Grouping(pub Box<dyn Expr>);
 
+pub struct Variable {
+    pub name: Token,
+}
+
 pub trait Visitor<T> {
     fn visit_literal(&self, e: &Literal) -> T;
     fn visit_unary(&self, e: &Unary) -> T;
     fn visit_binary(&self, e: &Binary) -> T;
     fn visit_ternary(&self, e: &Ternary) -> T;
     fn visit_grouping(&self, e: &Grouping) -> T;
+    fn visit_variable(&self, e: &Variable) -> T;
 }
 
 type RuntimeResult = Result<RuntimeValue, RuntimeError>;
@@ -90,5 +95,14 @@ impl Expr for Grouping {
     }
     fn accept_rt_value(&self, v: &dyn Visitor<RuntimeResult>) -> RuntimeResult {
         v.visit_grouping(self)
+    }
+}
+
+impl Expr for Variable {
+    fn accept_string(&self, v: &dyn Visitor<String>) -> String {
+        v.visit_variable(self)
+    }
+    fn accept_rt_value(&self, v: &dyn Visitor<RuntimeResult>) -> RuntimeResult {
+        v.visit_variable(self)
     }
 }

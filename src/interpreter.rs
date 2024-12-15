@@ -42,6 +42,10 @@ impl statement::Visitor<()> for Interpreter {
             println!("{}", stringify(&v));
         }
     }
+
+    fn visit_variable(&mut self, s: &statement::Variable) -> () {
+        unimplemented!()
+    }
 }
 
 fn stringify(val: &RuntimeValue) -> String {

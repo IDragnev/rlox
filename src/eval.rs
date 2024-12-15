@@ -172,6 +172,13 @@ impl Visitor<EvalResult> for ExprEvalVisitor {
     ) -> EvalResult {
         e.0.accept_rt_value(self)
     }
+
+    fn visit_variable(
+        &self,
+        e: &expression::Variable,
+    ) -> EvalResult {
+        unimplemented!() // todo
+    }
 }
 
 fn is_truthy(value: &RuntimeValue) -> bool {

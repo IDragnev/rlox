@@ -9,6 +9,7 @@ use crate::expression::{
     Literal,
     Ternary,
     Unary,
+    Variable,
 };
 use crate::statement::{self, Stmt};
 use std::iter::Peekable;
@@ -20,6 +21,7 @@ pub enum ParseErrorType {
     ExpectedExpression,
     ExpectedSemicolon,
     ExpectedStatement,
+    ExpectedIdentifier,
 }
 
 #[derive(Clone, Debug)]
@@ -50,7 +52,7 @@ impl Parser {
                 break;
             }
 
-            match self.parse_statement(&mut iter) {
+            match self.parse_declaration(&mut iter) {
                 Ok(stmt) => {
                     if errors.len() == 0 {
                         statements.push(stmt);
@@ -75,6 +77,43 @@ impl Parser {
     fn parse_single_expr(&self) -> Result<Box<dyn Expr>, ParseError> {
         let mut iter = self.tokens.iter().peekable();
         self.parse_expr(&mut iter)
+    }
+
+    fn parse_declaration(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Stmt>, ParseError> {
+        if let Some(&token) = iter.peek() {
+            match token.token_type {
+                TokenType::Var => self.parse_var_decl(iter),
+                _ => self.parse_statement(iter),
+            }
+        }
+        else {
+            self.parse_statement(iter)
+        }
+    }
+
+    fn parse_var_decl(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Stmt>, ParseError> {
+        let _var = iter.next();
+        let name = self.consume_token(
+            iter,
+            TokenType::Identifier,
+            ParseErrorType::ExpectedIdentifier)?;
+
+        let mut initializer = None;
+        if let Some(_) = iter.next_if(|t| t.token_type == TokenType::Equal) {
+            initializer = Some(self.parse_expr(iter)?);
+        }
+        let _ = self.consume_token(iter, TokenType::Semicolon, ParseErrorType::ExpectedSemicolon)?;
+
+        Ok(Box::new(statement::Variable{
+            name,
+            initializer,
+        }))
     }
 
     fn parse_statement(
@@ -386,6 +425,11 @@ impl Parser {
                         });
                     }
                 },
+                TokenType::Identifier => {
+                    return Ok(Box::new(Variable {
+                        name: token.clone()
+                    }));
+                },
                 _ => {
                     return Err(ParseError {
                         error_type: ParseErrorType::ExpectedExpression
@@ -503,6 +547,10 @@ mod tests {
         fn visit_grouping(&self, e: &expression::Grouping) -> String {
             format!("(group {})", e.0.accept_string(self))
         }
+
+        fn visit_variable(&self, e: &expression::Variable) -> String {
+            e.name.lexeme.clone()
+        }
     }
 
     #[test]
@@ -525,13 +573,13 @@ mod tests {
 
     #[test]
     fn parse_comma_separated_primary_expressions() {
-        let parser = Parser::new(&scan("nil,12.5,\"str\",true,false").unwrap());
+        let parser = Parser::new(&scan("nil,12.5,\"str\",true,false,name").unwrap());
         let expr = parser.parse_single_expr();
 
         assert!(expr.is_ok());
         if expr.is_ok() {
             let str = expr.unwrap().accept_string(&PrintVisitor{});
-            assert_eq!(str, "(, (, (, (, nil 12.5) str) true) false)");
+            assert_eq!(str, "(, (, (, (, (, nil 12.5) str) true) false) name)");
         }
     }
 
