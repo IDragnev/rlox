@@ -1,40 +1,17 @@
 use crate::{
-    expression::{
-        self,
-        Visitor,
-    },
+    expression,
     scanner::{
         Token,
         TokenType,
     },
+    RuntimeValue,
+    RuntimeError,
 };
-
-pub enum RuntimeValue {
-    Nil,
-    Bool(bool),
-    Number(f64),
-    String(String),
-}
-
-#[derive(Debug)]
-pub enum RuntimeError {
-    UnknownUnaryExpression(Token),
-    UnknownBinaryExpression(Token),
-    UnaryMinusExpectsNumber(Token),
-    BinaryOperatorExpectsNumbers(Token),
-    BinaryPlusExpectsTwoNumbersOrTwoStrings(Token),
-    DivisionByZero(Token),
-}
+use super::Interpreter;
 
 type EvalResult = Result<RuntimeValue, RuntimeError>;
 
-pub fn evaluate(expr: &Box<dyn expression::Expr>) -> EvalResult {
-    expr.accept_rt_value(&ExprEvalVisitor{})
-}
-
-struct ExprEvalVisitor {}
-
-impl Visitor<EvalResult> for ExprEvalVisitor {
+impl expression::Visitor<EvalResult> for Interpreter {
     fn visit_literal(
         &self,
         e: &expression::Literal,
@@ -177,7 +154,9 @@ impl Visitor<EvalResult> for ExprEvalVisitor {
         &self,
         e: &expression::Variable,
     ) -> EvalResult {
-        unimplemented!() // todo
+        self.env.get(&e.name.lexeme)
+            .ok_or(RuntimeError::UndefinedVariable(e.name.clone()))
+            .map(|v| v.clone())
     }
 }
 

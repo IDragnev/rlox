@@ -1,17 +1,20 @@
+mod eval;
+mod env;
+
 use crate::{
-    eval::{
-        self, RuntimeValue
-     },
     expression,
     statement,
+    RuntimeValue,
 };
 
 pub struct Interpreter {
+    env: env::Environment,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Interpreter {
+            env: env::Environment::new(),
         }
     }
 
@@ -22,7 +25,7 @@ impl Interpreter {
     }
 
     fn evaluate_expr(&self, expr: &Box<dyn expression::Expr>) -> Option<RuntimeValue> {
-        match eval::evaluate(expr) {
+        match expr.accept_rt_value(self) {
             Ok(v) => Some(v),
             Err(rt_err) => {
                 println!("runtime error: {:?}", rt_err);
@@ -44,7 +47,14 @@ impl statement::Visitor<()> for Interpreter {
     }
 
     fn visit_variable(&mut self, s: &statement::Variable) -> () {
-        unimplemented!()
+        let mut v = RuntimeValue::Nil;
+        if let Some(ref init) = s.initializer {
+            if let Some(ev) = self.evaluate_expr(init) {
+                v = ev;
+            }
+        }
+
+        self.env.define(&s.name.lexeme, v);
     }
 }
 
