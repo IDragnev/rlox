@@ -1,4 +1,4 @@
-use crate::{expression, scanner::Token};
+use crate::{expression, scanner::Token, RuntimeError};
 
 pub struct Expression {
     pub expr: Box<dyn expression::Expr>,
@@ -19,24 +19,26 @@ pub trait Visitor<T> {
     fn visit_variable(&mut self, s: &Variable) -> T;
 }
 
+type ExecResult = Result<(), RuntimeError>;
+
 pub trait Stmt {
-    fn accept_exec(&self, v: &mut dyn Visitor<()>);
+    fn accept_exec(&self, v: &mut dyn Visitor<ExecResult>) -> ExecResult;
 }
 
 impl Stmt for Print {
-    fn accept_exec(&self, v: &mut dyn Visitor<()>) {
-        v.visit_print(self);
+    fn accept_exec(&self, v: &mut dyn Visitor<ExecResult>) -> ExecResult {
+        v.visit_print(self)
     }
 }
 
 impl Stmt for Expression {
-    fn accept_exec(&self, v: &mut dyn Visitor<()>) {
-        v.visit_expr(self);
+    fn accept_exec(&self, v: &mut dyn Visitor<ExecResult>) -> ExecResult {
+        v.visit_expr(self)
     }
 }
 
 impl Stmt for Variable {
-    fn accept_exec(&self, v: &mut dyn Visitor<()>) {
-        v.visit_variable(self);
+    fn accept_exec(&self, v: &mut dyn Visitor<ExecResult>) -> ExecResult {
+        v.visit_variable(self)
     }
 }

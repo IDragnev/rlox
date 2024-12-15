@@ -5,11 +5,14 @@ use crate::{
     expression,
     statement,
     RuntimeValue,
+    RuntimeError,
 };
 
 pub struct Interpreter {
     env: env::Environment,
 }
+
+pub type ExecResult = Result<(), RuntimeError>;
 
 impl Interpreter {
     pub fn new() -> Self {
@@ -18,43 +21,47 @@ impl Interpreter {
         }
     }
 
-    pub fn interpret_statements(&mut self, statements: &Vec<Box<dyn statement::Stmt>>) {
+    pub fn execute(&mut self, statements: &Vec<Box<dyn statement::Stmt>>) -> ExecResult {
         for s in statements.iter() {
-            s.accept_exec(self);
+            self.execute_statement(s)?;
         }
+
+        Ok(())
     }
 
-    fn evaluate_expr(&self, expr: &Box<dyn expression::Expr>) -> Option<RuntimeValue> {
-        match expr.accept_rt_value(self) {
-            Ok(v) => Some(v),
-            Err(rt_err) => {
-                println!("runtime error: {:?}", rt_err);
-                None
-            }
-        }
+    fn execute_statement(&mut self, s: &Box<dyn statement::Stmt>) -> ExecResult {
+        s.accept_exec(self)
+    }
+
+    fn evaluate_expr(&self, expr: &Box<dyn expression::Expr>) -> Result<RuntimeValue, RuntimeError> {
+        expr.accept_rt_value(self)
     }
 }
 
-impl statement::Visitor<()> for Interpreter {
-    fn visit_expr(&mut self, s: &statement::Expression) {
-        let _ = self.evaluate_expr(&s.expr);
+impl statement::Visitor<ExecResult> for Interpreter {
+    fn visit_expr(&mut self, s: &statement::Expression) -> ExecResult {
+        self.evaluate_expr(&s.expr)
+            .map(|_| ())
     }
 
-    fn visit_print(&mut self, s: &statement::Print) {
-        if let Some(v) = self.evaluate_expr(&s.expr) {
-            println!("{}", stringify(&v));
-        }
+    fn visit_print(&mut self, s: &statement::Print) -> ExecResult {
+        let v = self.evaluate_expr(&s.expr)?;
+        println!("{}", stringify(&v));
+
+        Ok(())
     }
 
-    fn visit_variable(&mut self, s: &statement::Variable) -> () {
-        let mut v = RuntimeValue::Nil;
-        if let Some(ref init) = s.initializer {
-            if let Some(ev) = self.evaluate_expr(init) {
-                v = ev;
-            }
-        }
+    fn visit_variable(&mut self, s: &statement::Variable) -> ExecResult {
+        let v = match s.initializer {
+            None => RuntimeValue::Nil,
+            Some(ref init) => {
+                self.evaluate_expr(init)?
+            },
+        };
 
         self.env.define(&s.name.lexeme, v);
+
+        Ok(())
     }
 }
 

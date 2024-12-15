@@ -30,11 +30,13 @@ fn main() -> Result<(), Error> {
         let contents = read_file(&PathBuf::from(filename))?;
         if let Some(stmts) = scan_parse(&contents) {
             let mut interp = Interpreter::new();
-            interp.interpret_statements(&stmts);
+            if let Err(e) =  interp.execute(&stmts) {
+                println!("Runtime error: {:?}", e);
+                std::process::exit(70);
+            }
         }
     }
 
-    // if runtime error in file mode, exit with code=70
     Ok(())
 }
 
@@ -61,7 +63,9 @@ fn repl() -> Result<(), Error> {
             break;
         }
         if let Some(statements) = scan_parse(&input) {
-            interp.interpret_statements(&statements);
+            if let Err(e) = interp.execute(&statements) {
+                println!("Runtime error: {:?}", e);
+            }
         }
     }
 
