@@ -13,7 +13,7 @@ type EvalResult = Result<RuntimeValue, RuntimeError>;
 
 impl expression::Visitor<EvalResult> for Interpreter {
     fn visit_literal(
-        &self,
+        &mut self,
         e: &expression::Literal,
     ) -> EvalResult {
         use expression::Literal as EL;
@@ -30,7 +30,7 @@ impl expression::Visitor<EvalResult> for Interpreter {
     }
 
     fn visit_unary(
-        &self,
+        &mut self,
         e: &expression::Unary,
     ) -> EvalResult {
         let value = e.right.accept_rt_value(self)?;
@@ -56,7 +56,7 @@ impl expression::Visitor<EvalResult> for Interpreter {
     }
 
     fn visit_binary(
-        &self,
+        &mut self,
         e: &expression::Binary,
     ) -> EvalResult {
         let left = e.left.accept_rt_value(self)?;
@@ -131,7 +131,7 @@ impl expression::Visitor<EvalResult> for Interpreter {
     }
 
     fn visit_ternary(
-        &self,
+        &mut self,
         e: &expression::Ternary,
     ) -> EvalResult {
         let cond = e.cond.accept_rt_value(self)?;
@@ -144,19 +144,33 @@ impl expression::Visitor<EvalResult> for Interpreter {
     }
 
     fn visit_grouping(
-        &self,
+        &mut self,
         e: &expression::Grouping,
     ) -> EvalResult {
         e.0.accept_rt_value(self)
     }
 
     fn visit_variable(
-        &self,
+        &mut self,
         e: &expression::Variable,
     ) -> EvalResult {
         self.env.get(&e.name.lexeme)
             .ok_or(RuntimeError::UndefinedVariable(e.name.clone()))
             .map(|v| v.clone())
+    }
+
+    fn visit_assignment(
+        &mut self,
+        e: &expression::Assignment,
+    ) -> EvalResult {
+        let v = self.evaluate_expr(&e.value)?;
+        let var_exists = self.env.assign(&e.name.lexeme, v.clone());
+        if var_exists {
+            Ok(v)
+        }
+        else {
+            Err(RuntimeError::UndefinedVariable(e.name.clone()))
+        }
     }
 }
 

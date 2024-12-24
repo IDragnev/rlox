@@ -16,6 +16,16 @@ impl Environment {
         self.bindings.insert(name.to_owned(), value);
     }
 
+    pub fn assign(&mut self, name: &str, value: RuntimeValue) -> bool {
+        match self.bindings.get_mut(name) {
+            Some(entry) => {
+                *entry = value;
+                true
+            },
+            None => false,
+        }
+    }
+
     pub fn get(&self, name: &str) -> Option<&RuntimeValue> {
         self.bindings.get(name)
     }

@@ -33,7 +33,7 @@ impl Interpreter {
         s.accept_exec(self)
     }
 
-    fn evaluate_expr(&self, expr: &Box<dyn expression::Expr>) -> Result<RuntimeValue, RuntimeError> {
+    fn evaluate_expr(&mut self, expr: &Box<dyn expression::Expr>) -> Result<RuntimeValue, RuntimeError> {
         expr.accept_rt_value(self)
     }
 }

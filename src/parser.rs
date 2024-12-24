@@ -10,6 +10,7 @@ use crate::expression::{
     Ternary,
     Unary,
     Variable,
+    Assignment,
 };
 use crate::statement::{self, Stmt};
 use std::iter::Peekable;
@@ -22,6 +23,7 @@ pub enum ParseErrorType {
     ExpectedSemicolon,
     ExpectedStatement,
     ExpectedIdentifier,
+    InvalidAssignment,
 }
 
 #[derive(Clone, Debug)]
@@ -169,13 +171,13 @@ impl Parser {
         &self,
         iter: &mut Peekable<Iter<'_, Token>>,
     ) -> Result<Box<dyn Expr>, ParseError> {
-        let mut result = self.parse_ternary(iter)?;
+        let mut result = self.parse_assignment(iter)?;
 
         while let Some(&token) = iter.peek() {
             match token.token_type {
                 TokenType::Comma => {
                     let operator = iter.next().unwrap().clone();
-                    let right = self.parse_ternary(iter)?;
+                    let right = self.parse_assignment(iter)?;
                     let binary = Box::new(Binary {
                         left: result,
                         right,
@@ -190,6 +192,34 @@ impl Parser {
         }
 
         Ok(result)
+    }
+
+    fn parse_assignment(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Expr>, ParseError> {
+        let left = self.parse_ternary(iter)?;
+
+        if let Some(_eq) = iter.next_if(|t| t.token_type == TokenType::Equal) {
+            let right = self.parse_assignment(iter)?;
+
+            // as of now only simple variables can be assigned to,
+            // needs to be fixed when classes & member variables are introduced
+            if let Some(name) = left.var_name() {
+                Ok(Box::new(Assignment {
+                    name,
+                    value: right,
+                }))
+            }
+            else {
+                Err(ParseError {
+                    error_type: ParseErrorType::InvalidAssignment
+                })
+            }
+        }
+        else {
+            Ok(left)
+        }
     }
 
     fn parse_ternary(
@@ -509,7 +539,7 @@ mod tests {
     struct PrintVisitor {}
 
     impl Visitor<String> for PrintVisitor {
-        fn visit_literal(&self, e: &expression::Literal) -> String {
+        fn visit_literal(&mut self, e: &expression::Literal) -> String {
             use expression::Literal;
 
             match e {
@@ -521,14 +551,14 @@ mod tests {
             }
         }
 
-        fn visit_unary(&self, e: &expression::Unary) -> String {
+        fn visit_unary(&mut self, e: &expression::Unary) -> String {
             format!("({} {})",
                     e.operator.lexeme,
                     e.right.accept_string(self),
             )
         }
 
-        fn visit_binary(&self, e: &expression::Binary) -> String {
+        fn visit_binary(&mut self, e: &expression::Binary) -> String {
             format!("({} {} {})",
                     e.operator.lexeme,
                     e.left.accept_string(self),
@@ -536,7 +566,7 @@ mod tests {
             )
         }
 
-        fn visit_ternary(&self, e: &expression::Ternary) -> String {
+        fn visit_ternary(&mut self, e: &expression::Ternary) -> String {
             format!("({} {} {})",
                     e.cond.accept_string(self),
                     e.left.accept_string(self),
@@ -544,12 +574,16 @@ mod tests {
             )
         }
 
-        fn visit_grouping(&self, e: &expression::Grouping) -> String {
+        fn visit_grouping(&mut self, e: &expression::Grouping) -> String {
             format!("(group {})", e.0.accept_string(self))
         }
 
-        fn visit_variable(&self, e: &expression::Variable) -> String {
+        fn visit_variable(&mut self, e: &expression::Variable) -> String {
             e.name.lexeme.clone()
+        }
+
+        fn visit_assignment(&mut self, e: &Assignment) -> String {
+            format!("(:= {} {})", e.name.lexeme, e.value.accept_string(self))
         }
     }
 
@@ -578,7 +612,7 @@ mod tests {
 
         assert!(expr.is_ok());
         if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&PrintVisitor{});
+            let str = expr.unwrap().accept_string(&mut PrintVisitor{});
             assert_eq!(str, "(, (, (, (, (, nil 12.5) str) true) false) name)");
         }
     }
@@ -590,7 +624,7 @@ mod tests {
 
         assert!(expr.is_ok());
         if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&PrintVisitor{});
+            let str = expr.unwrap().accept_string(&mut PrintVisitor{});
             assert_eq!(str, "(group nil)");
         }
     }
@@ -602,7 +636,7 @@ mod tests {
 
         assert!(expr.is_ok());
         if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&PrintVisitor{});
+            let str = expr.unwrap().accept_string(&mut PrintVisitor{});
             assert_eq!(str, "(- (- (- 12.5)))");
         }
     }
@@ -614,7 +648,7 @@ mod tests {
 
         assert!(expr.is_ok());
         if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&PrintVisitor{});
+            let str = expr.unwrap().accept_string(&mut PrintVisitor{});
             assert_eq!(str, "(/ (* 2 3) (- 2))");
         }
     }
@@ -626,7 +660,7 @@ mod tests {
 
         assert!(expr.is_ok());
         if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&PrintVisitor{});
+            let str = expr.unwrap().accept_string(&mut PrintVisitor{});
             assert_eq!(str, "(+ (- 2 3) (* 5 (- 2)))");
         }
     }
@@ -638,7 +672,7 @@ mod tests {
 
         assert!(expr.is_ok());
         if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&PrintVisitor{});
+            let str = expr.unwrap().accept_string(&mut PrintVisitor{});
             assert_eq!(str, "(> 2 (- (* 3 2) 10))");
         }
     }
@@ -650,7 +684,7 @@ mod tests {
 
         assert!(expr.is_ok());
         if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&PrintVisitor{});
+            let str = expr.unwrap().accept_string(&mut PrintVisitor{});
             assert_eq!(str, "(== (> 2 (- (* 3 2) 10)) false)");
         }
     }
@@ -662,7 +696,7 @@ mod tests {
 
         assert!(expr.is_ok());
         if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&PrintVisitor{});
+            let str = expr.unwrap().accept_string(&mut PrintVisitor{});
             assert_eq!(str, "((> 5 2) (+ 1 3) (* 2 4))");
         }
     }
@@ -674,7 +708,7 @@ mod tests {
 
         assert!(expr.is_ok());
         if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&PrintVisitor{});
+            let str = expr.unwrap().accept_string(&mut PrintVisitor{});
             assert_eq!(str, "(true true (false true (true true false)))");
         }
     }
