@@ -20,7 +20,6 @@ use core::slice::Iter;
 pub enum ParseErrorType {
     ExpectedToken(TokenType),
     ExpectedExpression,
-    ExpectedSemicolon,
     ExpectedStatement,
     ExpectedIdentifier,
     InvalidAssignment,
@@ -110,7 +109,10 @@ impl Parser {
         if let Some(_) = iter.next_if(|t| t.token_type == TokenType::Equal) {
             initializer = Some(self.parse_expr(iter)?);
         }
-        let _ = self.consume_token(iter, TokenType::Semicolon, ParseErrorType::ExpectedSemicolon)?;
+        let _ = self.consume_token(
+            iter,
+            TokenType::Semicolon,
+            ParseErrorType::ExpectedToken(TokenType::Semicolon))?;
 
         Ok(Box::new(statement::Variable{
             name,
@@ -125,6 +127,7 @@ impl Parser {
         if let Some(&token) = iter.peek() {
             match token.token_type {
                 TokenType::Print => self.parse_print_statement(iter),
+                TokenType::LeftBrace => self.parse_block_statement(iter),
                 _ => self.parse_expr_statement(iter),
             }
         }
@@ -141,7 +144,10 @@ impl Parser {
     ) -> Result<Box<dyn Stmt>, ParseError> {
         let _print = iter.next();
         let expr = self.parse_expr(iter)?;
-        let _ = self.consume_token(iter, TokenType::Semicolon, ParseErrorType::ExpectedSemicolon)?;
+        let _ = self.consume_token(
+            iter,
+            TokenType::Semicolon,
+            ParseErrorType::ExpectedToken(TokenType::Semicolon))?;
 
         Ok(Box::new(statement::Print{
             expr,
@@ -153,11 +159,53 @@ impl Parser {
         iter: &mut Peekable<Iter<'_, Token>>,
     ) -> Result<Box<dyn Stmt>, ParseError> {
         let expr = self.parse_expr(iter)?;
-        let _ = self.consume_token(iter, TokenType::Semicolon, ParseErrorType::ExpectedSemicolon)?;
+        let _ = self.consume_token(
+            iter,
+            TokenType::Semicolon,
+            ParseErrorType::ExpectedToken(TokenType::Semicolon))?;
 
         Ok(Box::new(statement::Expression{
             expr,
         }))
+    }
+
+    fn parse_block_statement(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Stmt>, ParseError> {
+        let statements = self.parse_block(iter)?;
+
+        Ok(Box::new(statement::Block {
+            statements,
+        }))
+    }
+
+    fn parse_block(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Vec<Box<dyn Stmt>>, ParseError> {
+        let _ = self.consume_token(
+            iter,
+            TokenType::LeftBrace,
+            ParseErrorType::ExpectedToken(TokenType::LeftBrace))?;
+
+        let mut statements = Vec::new();
+
+        while let Some(&token) = iter.peek() {
+            if token.token_type == TokenType::RightBrace {
+                break;
+            }
+
+            let stmt = self.parse_declaration(iter)?;
+            statements.push(stmt);
+        }
+
+        let _ = self.consume_token(
+            iter,
+            TokenType::RightBrace,
+            ParseErrorType::ExpectedToken(TokenType::RightBrace))?;
+
+        Ok(statements)
     }
 
     fn parse_expr(

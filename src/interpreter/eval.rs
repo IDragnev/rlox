@@ -164,7 +164,7 @@ impl expression::Visitor<EvalResult> for Interpreter {
         e: &expression::Assignment,
     ) -> EvalResult {
         let v = self.evaluate_expr(&e.value)?;
-        let var_exists = self.env.assign(&e.name.lexeme, v.clone());
+        let var_exists = self.env.assign(&e.name.lexeme, &v);
         if var_exists {
             Ok(v)
         }

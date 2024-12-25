@@ -9,7 +9,7 @@ use crate::{
 };
 
 pub struct Interpreter {
-    env: env::Environment,
+    env: env::EnvStack,
 }
 
 pub type ExecResult = Result<(), RuntimeError>;
@@ -17,8 +17,16 @@ pub type ExecResult = Result<(), RuntimeError>;
 impl Interpreter {
     pub fn new() -> Self {
         Interpreter {
-            env: env::Environment::new(),
+            env: env::EnvStack::new(),
         }
+    }
+
+    fn execute_block(&mut self, s: &Vec<Box<dyn statement::Stmt>>) -> ExecResult {
+        self.env.push_env();
+        let r = self.execute(s);
+        self.env.pop_env();
+
+        r
     }
 
     pub fn execute(&mut self, statements: &Vec<Box<dyn statement::Stmt>>) -> ExecResult {
@@ -59,9 +67,13 @@ impl statement::Visitor<ExecResult> for Interpreter {
             },
         };
 
-        self.env.define(&s.name.lexeme, v);
+        self.env.define(&s.name.lexeme, &v);
 
         Ok(())
+    }
+
+    fn visit_block(&mut self, s: &statement::Block) -> ExecResult {
+        self.execute_block(&s.statements)
     }
 }
 
