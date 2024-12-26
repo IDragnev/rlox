@@ -136,6 +136,7 @@ impl Parser {
     ) -> Result<Box<dyn Stmt>, ParseError> {
         if let Some(&token) = iter.peek() {
             match token.token_type {
+                TokenType::If => self.parse_if_statement(iter),
                 TokenType::Print => self.parse_print_statement(iter),
                 TokenType::LeftBrace => self.parse_block_statement(iter),
                 _ => self.parse_expr_statement(iter),
@@ -152,7 +153,10 @@ impl Parser {
         &self,
         iter: &mut Peekable<Iter<'_, Token>>,
     ) -> Result<Box<dyn Stmt>, ParseError> {
-        let _print = iter.next();
+        let _ = self.consume_token(
+            iter,
+            TokenType::Print,
+            ParseErrorType::ExpectedToken(TokenType::Print))?;
         let expr = self.parse_expr(iter)?;
         let _ = self.consume_token(
             iter,
@@ -176,6 +180,41 @@ impl Parser {
 
         Ok(Box::new(statement::Expression{
             expr,
+        }))
+    }
+
+    fn parse_if_statement(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Stmt>, ParseError> {
+        let _ = self.consume_token(
+            iter,
+            TokenType::If,
+            ParseErrorType::ExpectedToken(TokenType::If))?;
+        let _ = self.consume_token(
+            iter,
+            TokenType::LeftParen,
+            ParseErrorType::ExpectedToken(TokenType::LeftParen))?;
+
+        let cond = self.parse_expr(iter)?;
+
+        let _ = self.consume_token(
+            iter,
+            TokenType::RightParen,
+            ParseErrorType::ExpectedToken(TokenType::RightParen))?;
+
+        let then_branch = self.parse_statement(iter)?;
+
+        let mut else_branch = None;
+        if let Some(&_) = iter.next_if(|t| t.token_type == TokenType::Else) {
+            let else_stmt = self.parse_statement(iter)?;
+            else_branch = Some(else_stmt);
+        }
+
+        Ok(Box::new(statement::If {
+            cond,
+            then_branch,
+            else_branch,
         }))
     }
 

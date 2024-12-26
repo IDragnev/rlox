@@ -6,6 +6,7 @@ use crate::{
     statement,
     RuntimeValue,
     RuntimeError,
+    is_truthy,
 };
 
 pub struct Interpreter {
@@ -74,5 +75,18 @@ impl statement::Visitor<ExecResult> for Interpreter {
 
     fn visit_block(&mut self, s: &statement::Block) -> ExecResult {
         self.execute_block(&s.statements)
+    }
+
+    fn visit_if(&mut self, s: &statement::If) -> ExecResult {
+        let cond = self.evaluate_expr(&s.cond)?;
+        if is_truthy(&cond) {
+            self.execute_statement(&s.then_branch)
+        }
+        else {
+            match &s.else_branch {
+                Some(stmt) => self.execute_statement(stmt),
+                None => Ok(()),
+            }
+        }
     }
 }

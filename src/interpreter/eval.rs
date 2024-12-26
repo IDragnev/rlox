@@ -6,6 +6,7 @@ use crate::{
     },
     RuntimeValue,
     RuntimeError,
+    is_truthy,
 };
 use super::Interpreter;
 
@@ -171,14 +172,6 @@ impl expression::Visitor<EvalResult> for Interpreter {
         else {
             Err(RuntimeError::UndefinedVariable(e.name.clone()))
         }
-    }
-}
-
-fn is_truthy(value: &RuntimeValue) -> bool {
-    match value {
-        RuntimeValue::Nil => false,
-        RuntimeValue::Bool(b) => *b,
-        _ => true,
     }
 }
 

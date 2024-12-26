@@ -35,3 +35,11 @@ impl std::fmt::Display for RuntimeValue {
         }
     }
 }
+
+pub fn is_truthy(value: &RuntimeValue) -> bool {
+    match value {
+        RuntimeValue::Nil => false,
+        RuntimeValue::Bool(b) => *b,
+        _ => true,
+    }
+}
