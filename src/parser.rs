@@ -74,10 +74,20 @@ impl Parser {
         }
     }
 
-    #[cfg(test)] 
-    fn parse_single_expr(&self) -> Result<Box<dyn Expr>, ParseError> {
+    // Parses exactly one expression. If any input is left, it fails.
+    // Useful for tests and REPL mode.
+    pub fn parse_single_expr(&self) -> Result<Box<dyn Expr>, ParseError> {
         let mut iter = self.tokens.iter().peekable();
-        self.parse_expr(&mut iter)
+        let expr = self.parse_expr(&mut iter)?;
+
+        if iter.len() == 0 {
+            Ok(expr)
+        }
+        else {
+            Err(ParseError {
+                error_type: ParseErrorType::ExpectedExpression
+            })
+        }
     }
 
     fn parse_declaration(

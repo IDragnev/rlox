@@ -24,3 +24,14 @@ pub enum RuntimeError {
     DivisionByZero(Token),
     UndefinedVariable(Token),
 }
+
+impl std::fmt::Display for RuntimeValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RuntimeValue::Nil => write!(f, "nil"),
+            RuntimeValue::Bool(b) => write!(f, "{}", b),
+            RuntimeValue::Number(n) => write!(f, "{}", n),
+            RuntimeValue::String(s) => write!(f, "\"{}\"", s),
+        }
+    }
+}

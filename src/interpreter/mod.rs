@@ -21,12 +21,8 @@ impl Interpreter {
         }
     }
 
-    fn execute_block(&mut self, s: &Vec<Box<dyn statement::Stmt>>) -> ExecResult {
-        self.env.push_env();
-        let r = self.execute(s);
-        self.env.pop_env();
-
-        r
+    pub fn evaluate_expr(&mut self, expr: &Box<dyn expression::Expr>) -> Result<RuntimeValue, RuntimeError> {
+        expr.accept_rt_value(self)
     }
 
     pub fn execute(&mut self, statements: &Vec<Box<dyn statement::Stmt>>) -> ExecResult {
@@ -37,12 +33,16 @@ impl Interpreter {
         Ok(())
     }
 
-    fn execute_statement(&mut self, s: &Box<dyn statement::Stmt>) -> ExecResult {
-        s.accept_exec(self)
+    fn execute_block(&mut self, s: &Vec<Box<dyn statement::Stmt>>) -> ExecResult {
+        self.env.push_env();
+        let r = self.execute(s);
+        self.env.pop_env();
+
+        r
     }
 
-    fn evaluate_expr(&mut self, expr: &Box<dyn expression::Expr>) -> Result<RuntimeValue, RuntimeError> {
-        expr.accept_rt_value(self)
+    fn execute_statement(&mut self, s: &Box<dyn statement::Stmt>) -> ExecResult {
+        s.accept_exec(self)
     }
 }
 
@@ -54,7 +54,7 @@ impl statement::Visitor<ExecResult> for Interpreter {
 
     fn visit_print(&mut self, s: &statement::Print) -> ExecResult {
         let v = self.evaluate_expr(&s.expr)?;
-        println!("{}", stringify(&v));
+        println!("{}", &v);
 
         Ok(())
     }
@@ -74,14 +74,5 @@ impl statement::Visitor<ExecResult> for Interpreter {
 
     fn visit_block(&mut self, s: &statement::Block) -> ExecResult {
         self.execute_block(&s.statements)
-    }
-}
-
-fn stringify(val: &RuntimeValue) -> String {
-    match val {
-        RuntimeValue::Nil => "nil".to_owned(),
-        RuntimeValue::Number(n) => n.to_string(),
-        RuntimeValue::Bool(b) => b.to_string(),
-        RuntimeValue::String(s) => format!("\"{}\"", s),
     }
 }

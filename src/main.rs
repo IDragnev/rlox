@@ -3,7 +3,8 @@ mod error;
 use rlox::{
     interpreter::Interpreter,
     parser::Parser,
-    scanner::scan, statement,
+    scanner,
+    statement,
 };
 use std::{
     env, 
@@ -62,33 +63,64 @@ fn repl() -> Result<(), Error> {
         if input == "q" {
             break;
         }
-        if let Some(statements) = scan_parse(&input) {
-            if let Err(e) = interp.execute(&statements) {
-                println!("Runtime error: {:?}", e);
+
+        if let Some(tokens) = scan_input(&input) {
+            // Try to parse an expression first.
+            // If this fails, try to parse statements.
+            let parser = Parser::new(&tokens);
+            match parser.parse_single_expr() {
+                Ok(expr) => {
+                    match interp.evaluate_expr(&expr) {
+                        Ok(v) => {
+                            println!("{}", &v);
+                        },
+                        Err(e) => {
+                            println!("Error: {:?}", e);
+                        }
+                    }
+                }
+                Err(_) => {
+                    match parser.parse() {
+                        Ok(statements) => {
+                            if let Err(e) =  interp.execute(&statements) {
+                                println!("Error: {:?}", e);
+                            }
+                        },
+                        Err(errs) => {
+                            println!("Parse error: {:?}", errs);
+                        }
+                    }
+                }
             }
         }
+
     }
 
     Ok(())
 }
 
 fn scan_parse(input: &str) -> Option<Vec<Box<dyn statement::Stmt>>> {
-    match scan(&input) {
-        Ok(tokens) => {
-            let parser = Parser::new(&tokens);
-            match parser.parse() {
-                Ok(statements) => {
-                    return Some(statements)
-                },
-                Err(errs) => {
-                    println!("parse error: {:?}", errs);
-                }
+    if let Some(tokens) = scan_input(&input) {
+        let parser = Parser::new(&tokens);
+        match parser.parse() {
+            Ok(statements) => {
+                return Some(statements)
+            },
+            Err(errs) => {
+                println!("Parse error: {:?}", errs);
             }
-        },
-        Err(e) => {
-            println!("scan error: {:?}", e);
         }
     }
 
     None
+}
+
+fn scan_input(input: &str) -> Option<Vec<scanner::Token>> {
+    match scanner::scan(&input) {
+        Ok(tokens) => Some(tokens),
+        Err(e) => {
+            println!("Scan error: {:?}", e);
+            None
+        }
+    }
 }
