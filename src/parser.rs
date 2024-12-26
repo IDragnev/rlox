@@ -18,10 +18,12 @@ use core::slice::Iter;
 
 #[derive(Clone, Debug)]
 pub enum ParseErrorType {
-    ExpectedToken(TokenType),
+    ExpectedToken{
+        expected: TokenType,
+        found: Option<TokenType>,
+    },
     ExpectedExpression,
     ExpectedStatement,
-    ExpectedIdentifier,
     InvalidAssignment,
 }
 
@@ -109,20 +111,14 @@ impl Parser {
         &self,
         iter: &mut Peekable<Iter<'_, Token>>,
     ) -> Result<Box<dyn Stmt>, ParseError> {
-        let _var = iter.next();
-        let name = self.consume_token(
-            iter,
-            TokenType::Identifier,
-            ParseErrorType::ExpectedIdentifier)?;
+        let _var = self.consume_token(iter, TokenType::Var)?;
+        let name = self.consume_token(iter, TokenType::Identifier)?;
 
         let mut initializer = None;
         if let Some(_) = iter.next_if(|t| t.token_type == TokenType::Equal) {
             initializer = Some(self.parse_expr(iter)?);
         }
-        let _ = self.consume_token(
-            iter,
-            TokenType::Semicolon,
-            ParseErrorType::ExpectedToken(TokenType::Semicolon))?;
+        let _ = self.consume_token(iter, TokenType::Semicolon)?;
 
         Ok(Box::new(statement::Variable{
             name,
@@ -153,15 +149,9 @@ impl Parser {
         &self,
         iter: &mut Peekable<Iter<'_, Token>>,
     ) -> Result<Box<dyn Stmt>, ParseError> {
-        let _ = self.consume_token(
-            iter,
-            TokenType::Print,
-            ParseErrorType::ExpectedToken(TokenType::Print))?;
+        let _ = self.consume_token(iter, TokenType::Print)?;
         let expr = self.parse_expr(iter)?;
-        let _ = self.consume_token(
-            iter,
-            TokenType::Semicolon,
-            ParseErrorType::ExpectedToken(TokenType::Semicolon))?;
+        let _ = self.consume_token(iter, TokenType::Semicolon)?;
 
         Ok(Box::new(statement::Print{
             expr,
@@ -173,10 +163,7 @@ impl Parser {
         iter: &mut Peekable<Iter<'_, Token>>,
     ) -> Result<Box<dyn Stmt>, ParseError> {
         let expr = self.parse_expr(iter)?;
-        let _ = self.consume_token(
-            iter,
-            TokenType::Semicolon,
-            ParseErrorType::ExpectedToken(TokenType::Semicolon))?;
+        let _ = self.consume_token(iter, TokenType::Semicolon)?;
 
         Ok(Box::new(statement::Expression{
             expr,
@@ -187,21 +174,12 @@ impl Parser {
         &self,
         iter: &mut Peekable<Iter<'_, Token>>,
     ) -> Result<Box<dyn Stmt>, ParseError> {
-        let _ = self.consume_token(
-            iter,
-            TokenType::If,
-            ParseErrorType::ExpectedToken(TokenType::If))?;
-        let _ = self.consume_token(
-            iter,
-            TokenType::LeftParen,
-            ParseErrorType::ExpectedToken(TokenType::LeftParen))?;
+        let _ = self.consume_token(iter, TokenType::If)?;
+        let _ = self.consume_token(iter, TokenType::LeftParen)?;
 
         let cond = self.parse_expr(iter)?;
 
-        let _ = self.consume_token(
-            iter,
-            TokenType::RightParen,
-            ParseErrorType::ExpectedToken(TokenType::RightParen))?;
+        let _ = self.consume_token(iter, TokenType::RightParen)?;
 
         let then_branch = self.parse_statement(iter)?;
 
@@ -233,10 +211,7 @@ impl Parser {
         &self,
         iter: &mut Peekable<Iter<'_, Token>>,
     ) -> Result<Vec<Box<dyn Stmt>>, ParseError> {
-        let _ = self.consume_token(
-            iter,
-            TokenType::LeftBrace,
-            ParseErrorType::ExpectedToken(TokenType::LeftBrace))?;
+        let _ = self.consume_token(iter, TokenType::LeftBrace)?;
 
         let mut statements = Vec::new();
 
@@ -249,10 +224,7 @@ impl Parser {
             statements.push(stmt);
         }
 
-        let _ = self.consume_token(
-            iter,
-            TokenType::RightBrace,
-            ParseErrorType::ExpectedToken(TokenType::RightBrace))?;
+        let _ = self.consume_token(iter, TokenType::RightBrace)?;
 
         Ok(statements)
     }
@@ -331,29 +303,15 @@ impl Parser {
                     let _question_mark = iter.next();
 
                     let left = self.parse_equality(iter)?;
-                    if let Some(&token) = iter.peek() {
-                        if token.token_type == TokenType::Colon {
-                            let _colon = iter.next();
-                            let right = self.parse_ternary(iter)?;
+                    let _ = self.consume_token(iter, TokenType::Colon)?;
+                    let right = self.parse_ternary(iter)?;
 
-                            let ternary = Box::new(Ternary {
-                                cond: result,
-                                right,
-                                left,
-                            });
-                            result = ternary;
-                        }
-                        else {
-                            return Err(ParseError {
-                                error_type: ParseErrorType::ExpectedToken(TokenType::Colon),
-                            });
-                        }
-                    }
-                    else {
-                        return Err(ParseError {
-                            error_type: ParseErrorType::ExpectedToken(TokenType::Colon),
-                        });
-                    }
+                    let ternary = Box::new(Ternary {
+                        cond: result,
+                        right,
+                        left,
+                    });
+                    result = ternary;
                 },
                 _ => {
                     break;
@@ -535,22 +493,8 @@ impl Parser {
                 },
                 TokenType::LeftParen => {
                     let nested = self.parse_expr(iter)?;
-                    if let Some(&token) = iter.peek() {
-                        if token.token_type == TokenType::RightParen {
-                            let _ = iter.next();
-                            return Ok(Box::new(Grouping(nested)));
-                        }
-                        else {
-                            return Err(ParseError {
-                                error_type: ParseErrorType::ExpectedToken(TokenType::RightParen),
-                            });
-                        }
-                    }
-                    else {
-                        return Err(ParseError {
-                            error_type: ParseErrorType::ExpectedToken(TokenType::RightParen),
-                        });
-                    }
+                    let _ = self.consume_token(iter, TokenType::RightParen)?;
+                    return Ok(Box::new(Grouping(nested)));
                 },
                 TokenType::Identifier => {
                     return Ok(Box::new(Variable {
@@ -573,14 +517,20 @@ impl Parser {
     fn consume_token(
         &self,
         iter: &mut Peekable<Iter<'_, Token>>,
-        t: TokenType,
-        err: ParseErrorType,
+        expected: TokenType,
     ) -> Result<Token, ParseError> {
-        if let Some(token) = iter.next_if(|token| token.token_type == t) {
+        if let Some(token) = iter.next_if(|token| token.token_type == expected) {
             Ok(token.clone())
         }
         else {
-            Err(ParseError { error_type: err })
+            let found = iter.peek().map(|&found| found.token_type);
+
+            Err(ParseError {
+                error_type: ParseErrorType::ExpectedToken {
+                    expected,
+                    found,
+                }
+            })
         }
     }
 }
