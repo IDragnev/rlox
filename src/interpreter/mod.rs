@@ -89,4 +89,19 @@ impl statement::Visitor<ExecResult> for Interpreter {
             }
         }
     }
+
+    fn visit_while(&mut self, s: &statement::While) -> ExecResult {
+        loop {
+            let cond = self.evaluate_expr(&s.cond)?;
+
+            if is_truthy(&cond) {
+                self.execute_statement(&s.body)?;
+            }
+            else {
+                break;
+            }
+        }
+
+        Ok(())
+    }
 }

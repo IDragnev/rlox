@@ -23,12 +23,18 @@ pub struct If {
     pub else_branch: Option<Box<dyn Stmt>>,
 }
 
+pub struct While {
+    pub cond: Box<dyn Expr>,
+    pub body: Box<dyn Stmt>,
+}
+
 pub trait Visitor<T> {
     fn visit_expr(&mut self, s: &Expression) -> T;
     fn visit_print(&mut self, s: &Print) -> T;
     fn visit_variable(&mut self, s: &Variable) -> T;
     fn visit_block(&mut self, s: &Block) -> T;
     fn visit_if(&mut self, s: &If) -> T;
+    fn visit_while(&mut self, s: &While) -> T;
 }
 
 type ExecResult = Result<(), RuntimeError>;
@@ -64,5 +70,11 @@ impl Stmt for Block {
 impl Stmt for If {
     fn accept_exec(&self, v: &mut dyn Visitor<ExecResult>) -> ExecResult {
         v.visit_if(self)
+    }
+}
+
+impl Stmt for While {
+    fn accept_exec(&self, v: &mut dyn Visitor<ExecResult>) -> ExecResult {
+        v.visit_while(self)
     }
 }

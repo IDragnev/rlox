@@ -133,6 +133,7 @@ impl Parser {
         if let Some(&token) = iter.peek() {
             match token.token_type {
                 TokenType::If => self.parse_if_statement(iter),
+                TokenType::While => self.parse_while_statement(iter),
                 TokenType::Print => self.parse_print_statement(iter),
                 TokenType::LeftBrace => self.parse_block_statement(iter),
                 _ => self.parse_expr_statement(iter),
@@ -193,6 +194,25 @@ impl Parser {
             cond,
             then_branch,
             else_branch,
+        }))
+    }
+
+    fn parse_while_statement(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Stmt>, ParseError> {
+        let _ = self.consume_token(iter, TokenType::While)?;
+        let _ = self.consume_token(iter, TokenType::LeftParen)?;
+
+        let cond = self.parse_expr(iter)?;
+
+        let _ = self.consume_token(iter, TokenType::RightParen)?;
+
+        let body = self.parse_statement(iter)?;
+
+        Ok(Box::new(statement::While {
+            cond,
+            body,
         }))
     }
 
