@@ -25,6 +25,8 @@ pub enum ParseErrorType {
     ExpectedExpression,
     ExpectedStatement,
     InvalidAssignment,
+    ExpectedForLoopInitializerOrSemiColon,
+    ExpectedForLoopConditionOrSemiColon,
 }
 
 #[derive(Clone, Debug)]
@@ -133,6 +135,7 @@ impl Parser {
         if let Some(&token) = iter.peek() {
             match token.token_type {
                 TokenType::If => self.parse_if_statement(iter),
+                TokenType::For => self.parse_for_statement(iter),
                 TokenType::While => self.parse_while_statement(iter),
                 TokenType::Print => self.parse_print_statement(iter),
                 TokenType::LeftBrace => self.parse_block_statement(iter),
@@ -195,6 +198,89 @@ impl Parser {
             then_branch,
             else_branch,
         }))
+    }
+
+    fn parse_for_statement(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Stmt>, ParseError> {
+        let _ = self.consume_token(iter, TokenType::For)?;
+        let _ = self.consume_token(iter, TokenType::LeftParen)?;
+
+        let initializer = match iter.peek() {
+            None => {
+                return Err(ParseError {
+                    error_type: ParseErrorType::ExpectedForLoopInitializerOrSemiColon
+                })
+            },
+            Some(&token) => match token.token_type {
+                TokenType::Semicolon => {
+                    let _ = iter.next();
+                    None
+                }
+                TokenType::Var => Some(self.parse_var_decl(iter)?),
+                _ => Some(self.parse_expr_statement(iter)?),
+            },
+        };
+
+        let cond = match iter.peek() {
+            None => {
+                return Err(ParseError {
+                    error_type: ParseErrorType::ExpectedForLoopConditionOrSemiColon
+                })
+            },
+            Some(&token) => match token.token_type {
+                TokenType::Semicolon => None,
+                _ => Some(self.parse_expr(iter)?),
+            },
+        };
+        let _ = self.consume_token(iter, TokenType::Semicolon)?;
+
+        let increment = match iter.peek() {
+            Some(&token) => match token.token_type {
+                TokenType::RightParen => None,
+                _ => Some(self.parse_expr(iter)?),
+            },
+            None => {
+                // this is a parse error but we let the next statement trigger it
+                None
+            },
+        };
+        let _ = self.consume_token(iter, TokenType::RightParen)?;
+
+        let mut body = self.parse_statement(iter)?;
+
+        // desugar the for loop into a while loop
+        if let Some(inc) = increment {
+            body = Box::new(statement::Block {
+                statements: vec![
+                    body,
+                    Box::new(statement::Expression {
+                        expr: inc,
+                    }),
+                ]
+            });
+        }
+
+        let cond = match cond {
+            None => Box::new(Literal::True),
+            Some(c) => c,
+        };
+        body = Box::new(statement::While {
+            cond,
+            body,
+        });
+
+        if let Some(init) = initializer {
+            body = Box::new(statement::Block {
+                statements: vec![
+                    init,
+                    body,
+                ]
+            });
+        }
+
+        Ok(body)
     }
 
     fn parse_while_statement(
