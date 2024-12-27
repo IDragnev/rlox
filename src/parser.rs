@@ -11,6 +11,7 @@ use crate::expression::{
     Unary,
     Variable,
     Assignment,
+    Logical,
 };
 use crate::statement::{self, Stmt};
 use std::iter::Peekable;
@@ -295,14 +296,14 @@ impl Parser {
         &self,
         iter: &mut Peekable<Iter<'_, Token>>,
     ) -> Result<Box<dyn Expr>, ParseError> {
-        let mut result = self.parse_equality(iter)?;
+        let mut result = self.parse_logic_or(iter)?;
 
         while let Some(&token) = iter.peek() {
             match token.token_type {
                 TokenType::QuestionMark => {
                     let _question_mark = iter.next();
 
-                    let left = self.parse_equality(iter)?;
+                    let left = self.parse_logic_or(iter)?;
                     let _ = self.consume_token(iter, TokenType::Colon)?;
                     let right = self.parse_ternary(iter)?;
 
@@ -319,6 +320,60 @@ impl Parser {
             }
         }
 
+        Ok(result)
+    }
+
+    fn parse_logic_or(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Expr>, ParseError> {
+        let mut result = self.parse_logic_and(iter)?;
+
+        while let Some(&token) = iter.peek() {
+            match token.token_type {
+                TokenType::Or => {
+                    let operator = iter.next().unwrap().clone();
+                    let right = self.parse_logic_and(iter)?;
+                    let expr = Box::new(Logical {
+                        left: result,
+                        right,
+                        operator,
+                    });
+                    result = expr;
+                },
+                _ => {
+                    break;
+                }
+            }
+        }
+        
+        Ok(result)
+    }
+
+    fn parse_logic_and(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Expr>, ParseError> {
+        let mut result = self.parse_equality(iter)?;
+
+        while let Some(&token) = iter.peek() {
+            match token.token_type {
+                TokenType::And => {
+                    let operator = iter.next().unwrap().clone();
+                    let right = self.parse_equality(iter)?;
+                    let expr = Box::new(Logical {
+                        left: result,
+                        right,
+                        operator,
+                    });
+                    result = expr;
+                },
+                _ => {
+                    break;
+                }
+            }
+        }
+        
         Ok(result)
     }
 
@@ -613,6 +668,14 @@ mod tests {
             )
         }
 
+        fn visit_logical(&mut self, e: &expression::Logical) -> String {
+            format!("({} {} {})",
+                    e.operator.lexeme,
+                    e.left.accept_string(self),
+                    e.right.accept_string(self),
+            )
+        }
+
         fn visit_ternary(&mut self, e: &expression::Ternary) -> String {
             format!("({} {} {})",
                     e.cond.accept_string(self),
@@ -700,6 +763,18 @@ mod tests {
         }
     }
 
+    #[test]
+    fn parse_logical() {
+        let parser = Parser::new(&scan("true or false and true").unwrap());
+        let expr = parser.parse_single_expr();
+
+        assert!(expr.is_ok());
+        if expr.is_ok() {
+            let str = expr.unwrap().accept_string(&mut PrintVisitor{});
+            assert_eq!(str, "(or true (and false true))");
+        }
+    }
+    
     #[test]
     fn parse_term() {
         let parser = Parser::new(&scan("2 - 3 + 5 * -2").unwrap());

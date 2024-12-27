@@ -131,6 +131,27 @@ impl expression::Visitor<EvalResult> for Interpreter {
         }
     }
 
+    fn visit_logical(&mut self, e: &expression::Logical) -> EvalResult {
+        let left = self.evaluate_expr(&e.left)?;
+        let left_truthy = is_truthy(&left);
+
+        match e.operator.token_type {
+            TokenType::Or => {
+                if left_truthy { 
+                    return Ok(left);
+                }
+            },
+            TokenType::And => {
+                if left_truthy == false {
+                    return Ok(left);
+                }
+            },
+            _ => panic!("expected logical operator"),
+        }
+
+        self.evaluate_expr(&e.right)
+    }
+
     fn visit_ternary(
         &mut self,
         e: &expression::Ternary,
