@@ -31,12 +31,6 @@ pub struct Logical {
     pub operator: Token,
 }
 
-pub struct Ternary {
-    pub cond: Box<dyn Expr>,
-    pub left: Box<dyn Expr>,
-    pub right: Box<dyn Expr>,
-}
-
 pub struct Grouping(pub Box<dyn Expr>);
 
 pub struct Variable {
@@ -53,7 +47,6 @@ pub trait Visitor<T> {
     fn visit_unary(&mut self, e: &Unary) -> T;
     fn visit_binary(&mut self, e: &Binary) -> T;
     fn visit_logical(&mut self, e: &Logical) -> T;
-    fn visit_ternary(&mut self, e: &Ternary) -> T;
     fn visit_grouping(&mut self, e: &Grouping) -> T;
     fn visit_variable(&mut self, e: &Variable) -> T;
     fn visit_assignment(&mut self, e: &Assignment) -> T;
@@ -93,15 +86,6 @@ impl Expr for Binary {
     }
     fn accept_rt_value(&self, v: &mut dyn Visitor<RuntimeResult>) -> RuntimeResult {
         v.visit_binary(self)
-    }
-}
-
-impl Expr for Ternary {
-    fn accept_string(&self, v: &mut dyn Visitor<String>) -> String {
-        v.visit_ternary(self)
-    }
-    fn accept_rt_value(&self, v: &mut dyn Visitor<RuntimeResult>) -> RuntimeResult {
-        v.visit_ternary(self)
     }
 }
 

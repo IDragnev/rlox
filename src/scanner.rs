@@ -12,8 +12,6 @@ pub enum TokenType {
     Minus,
     Plus,
     Semicolon,
-    Colon,
-    QuestionMark,
     Slash,
     Star,
 
@@ -226,12 +224,6 @@ fn scan_ascii_line(
             ';' => {
                 push_token(Token::single_character(TokenType::Semicolon, c))
             },
-            ':' => {
-                push_token(Token::single_character(TokenType::Colon, c))
-            },
-            '?' => {
-                push_token(Token::single_character(TokenType::QuestionMark, c))
-            },
             '*' => {
                 push_token(Token::single_character(TokenType::Star, c))
             },
@@ -427,8 +419,8 @@ mod tests {
             while (w > 0) {
                 w = w - 1;
             }
-        
-            var tern = (1 * 10 > 10) ? true : nil;
+
+            var logicals = true or false and true;
             var comma = 1, 2, (5 + 3);
 
             class A {

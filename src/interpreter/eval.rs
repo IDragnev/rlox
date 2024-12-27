@@ -152,19 +152,6 @@ impl expression::Visitor<EvalResult> for Interpreter {
         self.evaluate_expr(&e.right)
     }
 
-    fn visit_ternary(
-        &mut self,
-        e: &expression::Ternary,
-    ) -> EvalResult {
-        let cond = e.cond.accept_rt_value(self)?;
-        if is_truthy(&cond) {
-            e.left.accept_rt_value(self)
-        }
-        else {
-            e.right.accept_rt_value(self)
-        }
-    }
-
     fn visit_grouping(
         &mut self,
         e: &expression::Grouping,

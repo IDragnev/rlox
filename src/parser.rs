@@ -7,7 +7,6 @@ use crate::expression::{
     Expr,
     Grouping,
     Literal,
-    Ternary,
     Unary,
     Variable,
     Assignment,
@@ -268,7 +267,7 @@ impl Parser {
         &self,
         iter: &mut Peekable<Iter<'_, Token>>,
     ) -> Result<Box<dyn Expr>, ParseError> {
-        let left = self.parse_ternary(iter)?;
+        let left = self.parse_logic_or(iter)?;
 
         if let Some(_eq) = iter.next_if(|t| t.token_type == TokenType::Equal) {
             let right = self.parse_assignment(iter)?;
@@ -290,37 +289,6 @@ impl Parser {
         else {
             Ok(left)
         }
-    }
-
-    fn parse_ternary(
-        &self,
-        iter: &mut Peekable<Iter<'_, Token>>,
-    ) -> Result<Box<dyn Expr>, ParseError> {
-        let mut result = self.parse_logic_or(iter)?;
-
-        while let Some(&token) = iter.peek() {
-            match token.token_type {
-                TokenType::QuestionMark => {
-                    let _question_mark = iter.next();
-
-                    let left = self.parse_logic_or(iter)?;
-                    let _ = self.consume_token(iter, TokenType::Colon)?;
-                    let right = self.parse_ternary(iter)?;
-
-                    let ternary = Box::new(Ternary {
-                        cond: result,
-                        right,
-                        left,
-                    });
-                    result = ternary;
-                },
-                _ => {
-                    break;
-                }
-            }
-        }
-
-        Ok(result)
     }
 
     fn parse_logic_or(
@@ -676,14 +644,6 @@ mod tests {
             )
         }
 
-        fn visit_ternary(&mut self, e: &expression::Ternary) -> String {
-            format!("({} {} {})",
-                    e.cond.accept_string(self),
-                    e.left.accept_string(self),
-                    e.right.accept_string(self),
-            )
-        }
-
         fn visit_grouping(&mut self, e: &expression::Grouping) -> String {
             format!("(group {})", e.0.accept_string(self))
         }
@@ -703,9 +663,6 @@ mod tests {
         assert!(parser.parse().is_err());
 
         let parser = Parser::new(&scan("=== 10").unwrap());
-        assert!(parser.parse().is_err());
-
-        let parser = Parser::new(&scan("true ? true ? false : true : false").unwrap());
         assert!(parser.parse().is_err());
 
         let parser = Parser::new(&scan("(1 + 2").unwrap());
@@ -808,30 +765,6 @@ mod tests {
         if expr.is_ok() {
             let str = expr.unwrap().accept_string(&mut PrintVisitor{});
             assert_eq!(str, "(== (> 2 (- (* 3 2) 10)) false)");
-        }
-    }
-
-    #[test]
-    fn parse_ternary() {
-        let parser = Parser::new(&scan("5 > 2 ? 1 + 3 : 2 * 4").unwrap());
-        let expr = parser.parse_single_expr();
-
-        assert!(expr.is_ok());
-        if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&mut PrintVisitor{});
-            assert_eq!(str, "((> 5 2) (+ 1 3) (* 2 4))");
-        }
-    }
-
-    #[test]
-    fn parse_nested_ternary() {
-        let parser = Parser::new(&scan("true ? true : false ? true : true ? true : false").unwrap());
-        let expr = parser.parse_single_expr();
-
-        assert!(expr.is_ok());
-        if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&mut PrintVisitor{});
-            assert_eq!(str, "(true true (false true (true true false)))");
         }
     }
 }
