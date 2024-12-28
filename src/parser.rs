@@ -873,4 +873,146 @@ mod tests {
             assert_eq!(str, "(== (> 2 (- (* 3 2) 10)) false)");
         }
     }
+
+    #[test]
+    fn parse_var_decl_valid_succeeds() {
+        let tokens = scan("var x = 10; var y;").unwrap();
+        assert!(Parser::new(&tokens).parse().is_ok());
+    }
+
+    #[test]
+    fn parse_var_decl_invalid_fails() {
+        let tokens = scan("var x, y;").unwrap();
+        assert!(Parser::new(&tokens).parse().is_err());
+    }
+
+    #[test]
+    fn parse_expr_stmt() {
+        let tokens = scan("2;").unwrap();
+        assert!(Parser::new(&tokens).parse().is_ok());
+    }
+
+    #[test]
+    fn parse_print_stmt() {
+        let tokens = scan("print 2;").unwrap();
+        assert!(Parser::new(&tokens).parse().is_ok());
+    }
+
+    #[test]
+    fn parse_block_stmt_valid_succeeds() {
+        let tokens = scan("{ { 2; 3; { } } }").unwrap();
+        assert!(Parser::new(&tokens).parse().is_ok());
+    }
+
+    #[test]
+    fn parse_block_stmt_invalid_fails() {
+        let invalid_sources = [
+            "{ 2 }",
+            "{ { 2; 3; }",
+        ];
+
+        for src in invalid_sources.iter() {
+            let tokens = scan(src).unwrap();
+            assert!(Parser::new(&tokens).parse().is_err());
+        }
+    }
+
+    #[test]
+    fn parse_if_stmt_valid_succeeds() {
+        let valid_sources = [
+            "if (x) print x;",
+            "if (x) { print x; }",
+            "if (x) print x; else print y;",
+            "if (x) { print x; } else { print y; }",
+            "if (x) { print x; } else print y;",
+            "if (x) print x; else { print y; }",
+        ];
+
+        for src in valid_sources.iter() {
+            let tokens = scan(src).unwrap();
+            assert!(Parser::new(&tokens).parse().is_ok());
+        }
+    }
+
+    #[test]
+    fn parse_if_stmt_invalid_fails() {
+        let invalid_sources = [
+            "if x print x;",
+            "if (x print x;",
+            "if x) print x;",
+            "if (x) print x; else",
+            "if (x;) print x;",
+        ];
+
+        for src in invalid_sources.iter() {
+            let tokens = scan(src).unwrap();
+            assert!(Parser::new(&tokens).parse().is_err());
+        }
+    }
+
+    #[test]
+    fn parse_while_stmt_valid_succeeds() {
+        let valid_sources = [
+            "while (x) print x;",
+            "while (x) { print x; }",
+        ];
+
+        for src in valid_sources.iter() {
+            let tokens = scan(src).unwrap();
+            assert!(Parser::new(&tokens).parse().is_ok());
+        }
+    }
+
+    #[test]
+    fn parse_while_stmt_invalid_fails() {
+        let invalid_sources = [
+            "while x) { print x; }",
+            "while (x { print x; }",
+            "while (x;) { print x; }",
+        ];
+
+        for src in invalid_sources.iter() {
+            let tokens = scan(src).unwrap();
+            assert!(Parser::new(&tokens).parse().is_err());
+        }
+    }
+
+    #[test]
+    fn parse_for_stmt_valid_succeeds() {
+        let valid_sources = [
+            "for (i = 0; i < 5; i = i + 1) print i;",
+            "for (var i = 0; i < 5; i = i + 1) print i;",
+
+            "for (; i < 5; i = i + 1) print i;",
+            "for (i = 0;; i = i + 1) print i;",
+            "for (i = 0; i < 5;) print i;",
+
+            "for (i = 0;;) print i;",
+            "for (;true;) print i;",
+            "for (;; i = i + 1) print i;",
+
+            "for (;;) print i;",
+        ];
+
+        for src in valid_sources.iter() {
+            let tokens = scan(src).unwrap();
+            assert!(Parser::new(&tokens).parse().is_ok());
+        }
+    }
+
+    #[test]
+    fn parse_for_stmt_invalid_fails() {
+        let invalid_sources = [
+            "for (i = 0; i >=0 ) {}",
+            "for (i = 0; i > 0; i = i + 1 {}",
+            "for i = 0; i > 0; i = i + 1) {}",
+            "for (i = 0 i > 0; i = i + 1) {}",
+            "for () {}",
+        ];
+
+        for src in invalid_sources.iter() {
+            let tokens = scan(src).unwrap();
+            assert!(Parser::new(&tokens).parse().is_err());
+        }
+    }
 }
