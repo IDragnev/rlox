@@ -11,6 +11,7 @@ use crate::expression::{
     Variable,
     Assignment,
     Logical,
+    Call,
 };
 use crate::statement::{self, Stmt};
 use std::iter::Peekable;
@@ -581,8 +582,58 @@ impl Parser {
                 _ => { }
             }
         }
-        
-        self.parse_primary(iter)
+
+        self.parse_call(iter)
+    }
+
+    fn parse_call(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Expr>, ParseError> {
+        let mut expr = self.parse_primary(iter)?;
+
+        while let Some(&token) = iter.peek() {
+            match token.token_type {
+                TokenType::LeftParen => {
+                    let _ = self.consume_token(iter, TokenType::LeftParen)?;
+                    let args = self.parse_args(iter)?;
+                    let right_paren = self.consume_token(iter, TokenType::RightParen)?;
+
+                    expr = Box::new(Call {
+                        right_paren,
+                        callee: expr,
+                        args,
+                    })
+                }
+                _ => break,
+            }
+        }
+
+        Ok(expr)
+    }
+
+    fn parse_args(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Vec<Box<dyn Expr>>, ParseError> {
+        let mut args = Vec::new();
+
+        if let Some(&token) = iter.peek() {
+            if token.token_type == TokenType::RightParen {
+                return Ok(args);
+            }
+        }
+
+        loop {
+            let expr = self.parse_expr(iter)?;
+            args.push(expr);
+
+            if let None = iter.next_if(|t| t.token_type == TokenType::Comma) {
+                break;
+            }
+        }
+
+        Ok(args)
     }
 
     fn parse_primary(
@@ -760,6 +811,24 @@ mod tests {
 
         fn visit_assignment(&mut self, e: &Assignment) -> String {
             format!("(:= {} {})", e.name.lexeme, e.value.accept_string(self))
+        }
+
+        fn visit_call(&mut self, e: &Call) -> String {
+            let args_str = e.args.iter()
+                .map(|a| a.accept_string(self))
+                .fold(None, |acc, x| {
+                    match acc {
+                        None => Some(x),
+                        Some(y) => Some(y + "," + &x),
+                    }
+                })
+                .unwrap_or_default();
+
+            format!(
+                "(call {} {})",
+                e.callee.accept_string(self),
+                args_str,
+            )
         }
     }
 
@@ -1013,6 +1082,48 @@ mod tests {
         for src in invalid_sources.iter() {
             let tokens = scan(src).unwrap();
             assert!(Parser::new(&tokens).parse().is_err());
+        }
+    }
+
+    #[test]
+    fn parse_call_expr_valid_succeeds() {
+        let valid_sources = [
+            "myfun()",
+            "my_fun()()",
+            "my_fun(1)",
+            "my_fun(1, 2)",
+            "my_fun(1, 2, 3)",
+            "my_fun(1, 2, 3)()()",
+            "my_fun(1, 2, 3)()(2, 3)",
+        ];
+
+        for src in valid_sources.iter() {
+            let tokens = scan(src).unwrap();
+            assert!(Parser::new(&tokens).parse_single_expr().is_ok());
+        }
+
+        let tokens = scan(&"my_fun(1)(2)").unwrap();
+        let expr = Parser::new(&tokens).parse_single_expr();
+
+        assert!(expr.is_ok());
+        let s = expr.unwrap().accept_string(&mut PrintVisitor{});
+        assert_eq!(s, "(call (call my_fun 1) 2)");
+    }
+
+    #[test]
+    fn parse_call_expr_invalid_fails() {
+        let invalid_sources = [
+            "myfun(",
+            "myfun(1",
+            "myfun(1, 2",
+            "myfun(1,)",
+            "myfun(1,,)",
+            "myfun(1)(",
+        ];
+
+        for src in invalid_sources.iter() {
+            let tokens = scan(src).unwrap();
+            assert!(Parser::new(&tokens).parse_single_expr().is_err());
         }
     }
 }

@@ -42,6 +42,12 @@ pub struct Assignment {
     pub value: Box<dyn Expr>,
 }
 
+pub struct Call {
+    pub right_paren: Token,
+    pub callee: Box<dyn Expr>,
+    pub args: Vec<Box<dyn Expr>>,
+}
+
 pub trait Visitor<T> {
     fn visit_literal(&mut self, e: &Literal) -> T;
     fn visit_unary(&mut self, e: &Unary) -> T;
@@ -50,6 +56,7 @@ pub trait Visitor<T> {
     fn visit_grouping(&mut self, e: &Grouping) -> T;
     fn visit_variable(&mut self, e: &Variable) -> T;
     fn visit_assignment(&mut self, e: &Assignment) -> T;
+    fn visit_call(&mut self, e: &Call) -> T;
 }
 
 type RuntimeResult = Result<RuntimeValue, RuntimeError>;
@@ -127,5 +134,15 @@ impl Expr for Logical {
 
     fn accept_rt_value(&self, v: &mut dyn Visitor<RuntimeResult>) -> RuntimeResult {
         v.visit_logical(self)
+    }
+}
+
+impl Expr for Call {
+    fn accept_string(&self, v: &mut dyn Visitor<String>) -> String {
+        v.visit_call(self)
+    }
+
+    fn accept_rt_value(&self, v: &mut dyn Visitor<RuntimeResult>) -> RuntimeResult {
+        v.visit_call(self)
     }
 }

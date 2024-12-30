@@ -181,6 +181,10 @@ impl expression::Visitor<EvalResult> for Interpreter {
             Err(RuntimeError::UndefinedVariable(e.name.clone()))
         }
     }
+
+    fn visit_call(&mut self, e: &expression::Call) -> EvalResult {
+        unimplemented!()
+    }
 }
 
 fn eval_bin_num_operator(
