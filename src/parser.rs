@@ -102,12 +102,65 @@ impl Parser {
         if let Some(&token) = iter.peek() {
             match token.token_type {
                 TokenType::Var => self.parse_var_decl(iter),
+                TokenType::Fun => self.parse_fun_decl(iter),
                 _ => self.parse_statement(iter),
             }
         }
         else {
             self.parse_statement(iter)
         }
+    }
+
+    fn parse_fun_decl(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Stmt>, ParseError> {
+        let _ = self.consume_token(iter, TokenType::Fun)?;
+        self.parse_function(iter)
+    }
+
+    fn parse_function(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Stmt>, ParseError> {
+        // todo: add context to consume_token so error messages
+        // are more specific -> 'expected function name' instead of
+        // 'expected identifier'.
+        let name = self.consume_token(iter, TokenType::Identifier)?;
+        let _ = self.consume_token(iter, TokenType::LeftParen)?;
+        let params = self.parse_params(iter)?;
+        let _ = self.consume_token(iter, TokenType::RightParen)?;
+        let body = self.parse_block(iter)?;
+
+        Ok(Box::new(statement::Function {
+            name,
+            params,
+            body,
+        }))
+    }
+
+    fn parse_params(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Vec<Token>, ParseError> {
+        let mut params = Vec::new();
+
+        if let Some(&token) = iter.peek() {
+            if token.token_type == TokenType::RightParen {
+                return Ok(params);
+            }
+        }
+
+        loop {
+            let p = self.consume_token(iter, TokenType::Identifier)?;
+            params.push(p);
+
+            if let None = iter.next_if(|t| t.token_type == TokenType::Comma) {
+                break;
+            }
+        }
+
+        Ok(params)
     }
 
     fn parse_var_decl(
@@ -1124,6 +1177,38 @@ mod tests {
         for src in invalid_sources.iter() {
             let tokens = scan(src).unwrap();
             assert!(Parser::new(&tokens).parse_single_expr().is_err());
+        }
+    }
+
+    #[test]
+    fn parse_fun_stmt_valid_succeeds() {
+        let valid_sources = [
+            "fun myfun() { }",
+            "fun myfun(a) { print a; }",
+            "fun myfun(a, b) { }",
+            "fun myfun(a, b, c) { }",
+        ];
+
+        for src in valid_sources.iter() {
+            let tokens = scan(src).unwrap();
+            assert!(Parser::new(&tokens).parse().is_ok());
+        }
+    }
+
+    #[test]
+    fn parse_fun_stmt_invalid_fails() {
+        let invalid_sources = [
+            "fun myfun() print 1;",
+            "fun myfun {}",
+            "fun myfun( {}",
+            "fun myfun) {}",
+            "fun myfun(a,) {}",
+            "fun myfun(x = 1) {}",
+        ];
+
+        for src in invalid_sources.iter() {
+            let tokens = scan(src).unwrap();
+            assert!(Parser::new(&tokens).parse().is_err());
         }
     }
 }

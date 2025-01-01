@@ -28,6 +28,12 @@ pub struct While {
     pub body: Box<dyn Stmt>,
 }
 
+pub struct Function {
+    pub name: Token,
+    pub params: Vec<Token>,
+    pub body: Vec<Box<dyn Stmt>>,
+}
+
 pub trait Visitor<T> {
     fn visit_expr(&mut self, s: &Expression) -> T;
     fn visit_print(&mut self, s: &Print) -> T;
@@ -35,6 +41,7 @@ pub trait Visitor<T> {
     fn visit_block(&mut self, s: &Block) -> T;
     fn visit_if(&mut self, s: &If) -> T;
     fn visit_while(&mut self, s: &While) -> T;
+    fn visit_function(&mut self, s: &Function) -> T;
 }
 
 type ExecResult = Result<(), RuntimeError>;
@@ -76,5 +83,11 @@ impl Stmt for If {
 impl Stmt for While {
     fn accept_exec(&self, v: &mut dyn Visitor<ExecResult>) -> ExecResult {
         v.visit_while(self)
+    }
+}
+
+impl Stmt for Function {
+    fn accept_exec(&self, v: &mut dyn Visitor<ExecResult>) -> ExecResult {
+        v.visit_function(self)
     }
 }

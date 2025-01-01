@@ -104,4 +104,8 @@ impl statement::Visitor<ExecResult> for Interpreter {
 
         Ok(())
     }
+
+    fn visit_function(&mut self, s: &statement::Function) -> ExecResult {
+        unimplemented!()
+    }
 }
