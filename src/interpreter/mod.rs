@@ -1,5 +1,7 @@
 mod eval;
-mod env;
+pub mod env;
+
+use env::Environment;
 
 use crate::{
     expression,
@@ -8,17 +10,38 @@ use crate::{
     RuntimeError,
     is_truthy,
 };
+use dumpster::{
+    Trace,
+    unsync::Gc,
+    Visitor,
+};
+use std::cell::RefCell;
 
 pub struct Interpreter {
-    env: env::EnvStack,
+    globals_env: Gc<RefCell<Environment>>,
+    current_env: Gc<RefCell<Environment>>,
+}
+
+unsafe impl Trace for Interpreter {
+    fn accept<V: Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
+        self.globals_env.accept(visitor)?;
+        self.current_env.accept(visitor)?;
+
+        Ok(())
+    }
 }
 
 pub type ExecResult = Result<(), RuntimeError>;
 
 impl Interpreter {
     pub fn new() -> Self {
+        let globals = Gc::new(RefCell::new(
+            Environment::root()
+        ));
+
         Interpreter {
-            env: env::EnvStack::new(),
+            globals_env: globals.clone(),
+            current_env: globals,
         }
     }
 
@@ -34,10 +57,17 @@ impl Interpreter {
         Ok(())
     }
 
-    fn execute_block(&mut self, s: &Vec<Box<dyn statement::Stmt>>) -> ExecResult {
-        self.env.push_env();
+    pub fn execute_block(
+        &mut self,
+        s: &Vec<Box<dyn statement::Stmt>>,
+        env: Gc<RefCell<Environment>>,
+    ) -> ExecResult {
+        let prev_env = self.current_env.clone();
+
+        self.current_env = env;
         let r = self.execute(s);
-        self.env.pop_env();
+
+        self.current_env = prev_env;
 
         r
     }
@@ -68,13 +98,16 @@ impl statement::Visitor<ExecResult> for Interpreter {
             },
         };
 
-        self.env.define(&s.name.lexeme, &v);
+        self.current_env.borrow_mut().define(&s.name.lexeme, &v);
 
         Ok(())
     }
 
     fn visit_block(&mut self, s: &statement::Block) -> ExecResult {
-        self.execute_block(&s.statements)
+        let block_env = Gc::new(RefCell::new(
+            Environment::child(self.current_env.clone())
+        ));
+        self.execute_block(&s.statements, block_env)
     }
 
     fn visit_if(&mut self, s: &statement::If) -> ExecResult {
@@ -106,6 +139,19 @@ impl statement::Visitor<ExecResult> for Interpreter {
     }
 
     fn visit_function(&mut self, s: &statement::Function) -> ExecResult {
-        unimplemented!()
+        use crate::{Callable, Function};
+
+        let closure = self.current_env.clone();
+        let callable: Box<dyn Callable> = Box::new(Function {
+            decl: s.clone(),
+        });
+        let value = RuntimeValue::Callable {
+            callable: callable,
+            closure: Some(closure)
+        };
+
+        self.current_env.borrow_mut().define(&s.name.lexeme, &value);
+
+        Ok(())
     }
 }

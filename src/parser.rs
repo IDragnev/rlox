@@ -393,34 +393,7 @@ impl Parser {
         &self,
         iter: &mut Peekable<Iter<'_, Token>>,
     ) -> Result<Box<dyn Expr>, ParseError> {
-        self.parse_comma_separated(iter)
-    }
-
-    fn parse_comma_separated(
-        &self,
-        iter: &mut Peekable<Iter<'_, Token>>,
-    ) -> Result<Box<dyn Expr>, ParseError> {
-        let mut result = self.parse_assignment(iter)?;
-
-        while let Some(&token) = iter.peek() {
-            match token.token_type {
-                TokenType::Comma => {
-                    let operator = iter.next().unwrap().clone();
-                    let right = self.parse_assignment(iter)?;
-                    let binary = Box::new(Binary {
-                        left: result,
-                        right,
-                        operator,
-                    });
-                    result = binary;
-                },
-                _ => {
-                    break;
-                }
-            }
-        }
-
-        Ok(result)
+        self.parse_assignment(iter)
     }
 
     fn parse_assignment(
@@ -901,14 +874,20 @@ mod tests {
     }
 
     #[test]
-    fn parse_comma_separated_primary_expressions() {
-        let parser = Parser::new(&scan("nil,12.5,\"str\",true,false,name").unwrap());
-        let expr = parser.parse_single_expr();
+    fn parse_primary_expressions() {
+        let primaries = [
+            "nil",
+            "12.5",
+            "\"str\"",
+            "true",
+            "false",
+            "name",
+        ];
+        for primary in primaries {
+            let parser = Parser::new(&scan(primary).unwrap());
+            let expr = parser.parse_single_expr();
 
-        assert!(expr.is_ok());
-        if expr.is_ok() {
-            let str = expr.unwrap().accept_string(&mut PrintVisitor{});
-            assert_eq!(str, "(, (, (, (, (, nil 12.5) str) true) false) name)");
+            assert!(expr.is_ok());
         }
     }
 

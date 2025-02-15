@@ -163,7 +163,9 @@ impl expression::Visitor<EvalResult> for Interpreter {
         &mut self,
         e: &expression::Variable,
     ) -> EvalResult {
-        self.env.get(&e.name.lexeme)
+        self.current_env
+            .borrow()
+            .get(&e.name.lexeme)
             .ok_or(RuntimeError::UndefinedVariable(e.name.clone()))
             .map(|v| v.clone())
     }
@@ -173,7 +175,7 @@ impl expression::Visitor<EvalResult> for Interpreter {
         e: &expression::Assignment,
     ) -> EvalResult {
         let v = self.evaluate_expr(&e.value)?;
-        let var_exists = self.env.assign(&e.name.lexeme, &v);
+        let var_exists = self.current_env.borrow_mut().assign(&e.name.lexeme, &v);
         if var_exists {
             Ok(v)
         }
@@ -183,7 +185,27 @@ impl expression::Visitor<EvalResult> for Interpreter {
     }
 
     fn visit_call(&mut self, e: &expression::Call) -> EvalResult {
-        unimplemented!()
+        let value = self.evaluate_expr(&e.callee)?;
+
+        if let RuntimeValue::Callable{ callable, closure } = value {
+            if callable.arity() != e.args.len() {
+                return Err(RuntimeError::CallableArityMismatch {
+                    right_paren: e.right_paren.clone(),
+                    expected: callable.arity(),
+                    found: e.args.len(),
+                });
+            }
+
+            let mut args = Vec::new();
+            for a in &e.args {
+                args.push(self.evaluate_expr(a)?);
+            }
+
+            callable.call(&args, self, &closure)
+        }
+        else {
+            Err(RuntimeError::NonCallableCalled(e.right_paren.clone()))
+        }
     }
 }
 

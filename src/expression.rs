@@ -1,4 +1,3 @@
-
 use std::boxed::Box;
 use crate::scanner::Token;
 use crate::{
@@ -6,6 +5,7 @@ use crate::{
     RuntimeError,
 };
 
+#[derive(Clone)]
 pub enum Literal {
     Number(f64),
     String(String),
@@ -14,34 +14,41 @@ pub enum Literal {
     Nil,
 }
 
+#[derive(Clone)]
 pub struct Unary {
     pub operator: Token,
     pub right: Box<dyn Expr>,
 }
 
+#[derive(Clone)]
 pub struct Binary {
     pub left: Box<dyn Expr>,
     pub right: Box<dyn Expr>,
     pub operator: Token,
 }
 
+#[derive(Clone)]
 pub struct Logical {
     pub left: Box<dyn Expr>,
     pub right: Box<dyn Expr>,
     pub operator: Token,
 }
 
+#[derive(Clone)]
 pub struct Grouping(pub Box<dyn Expr>);
 
+#[derive(Clone)]
 pub struct Variable {
     pub name: Token,
 }
 
+#[derive(Clone)]
 pub struct Assignment {
     pub name: Token,
     pub value: Box<dyn Expr>,
 }
 
+#[derive(Clone)]
 pub struct Call {
     pub right_paren: Token,
     pub callee: Box<dyn Expr>,
@@ -61,13 +68,15 @@ pub trait Visitor<T> {
 
 type RuntimeResult = Result<RuntimeValue, RuntimeError>;
 
-pub trait Expr {
+pub trait Expr: dyn_clone::DynClone {
     // only valid for `Variable`. Temporary workaround for assignment parsing.
     fn var_name(&self) -> Option<Token> { None }
 
     fn accept_string(&self, v: &mut dyn Visitor<String>) -> String;
     fn accept_rt_value(&self, v: &mut dyn Visitor<RuntimeResult>) -> RuntimeResult;
 }
+
+dyn_clone::clone_trait_object!(Expr);
 
 impl Expr for Literal {
     fn accept_string(&self, v: &mut dyn Visitor<String>) -> String {

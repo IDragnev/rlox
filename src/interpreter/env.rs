@@ -1,86 +1,83 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    cell::RefCell,
+};
 use crate::RuntimeValue;
+use dumpster::{
+    Trace,
+    unsync::Gc,
+    Visitor,
+};
 
-struct Environment {
+#[derive(Clone)]
+pub struct Environment {
+    parent: Option<Gc<RefCell<Environment>>>,
     bindings: HashMap<String, RuntimeValue>,
 }
 
+unsafe impl Trace for Environment {
+    fn accept<V: Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
+        if let Some(p) = &self.parent {
+            p.accept(visitor)?;
+        }
+
+        for (_, value) in &self.bindings {
+            if let RuntimeValue::Callable { callable: _, closure } = value {
+                if let Some(cl) = closure {
+                    cl.accept(visitor)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
 impl Environment {
-    fn new() -> Self {
+    pub fn root() -> Self {
         Self {
+            parent: None,
             bindings: HashMap::new(),
         }
     }
 
-    fn define(&mut self, name: &str, value: &RuntimeValue) {
+    pub fn child(parent_env: Gc<RefCell<Environment>>) -> Self {
+        Self {
+            parent: Some(parent_env),
+            bindings: HashMap::new(),
+        }
+    }
+
+    pub fn define(&mut self, name: &str, value: &RuntimeValue) {
+        // definition is always done in the current env
         self.bindings.insert(name.to_owned(), value.clone());
     }
 
-    fn assign(&mut self, name: &str, value: &RuntimeValue) -> bool {
+    pub fn assign(&mut self, name: &str, value: &RuntimeValue) -> bool {
+        // assign the variable in the inner-most env
         match self.bindings.get_mut(name) {
             Some(entry) => {
                 *entry = value.clone();
                 true
             },
-            None => false,
+            None => {
+                match &mut self.parent {
+                    Some(p) => p.borrow_mut().assign(name, value),
+                    None => false,
+                }
+            },
         }
     }
 
-    fn get(&self, name: &str) -> Option<&RuntimeValue> {
-        self.bindings.get(name)
-    }
-}
-
-// An environment stack. We use a simple list,
-// nested environments go to the back of the list.
-// This means the current environment is the last
-// in the list and the root environment is the fist.
-pub struct EnvStack {
-    envs: Vec<Environment>,
-}
-
-impl EnvStack {
-    pub fn new() -> Self {
-        Self {
-            envs: vec![Environment::new()]
-        }
-    }
-
-    pub fn pop_env(&mut self) {
-        self.envs.pop();
-    }
-
-    pub fn push_env(&mut self) {
-        self.envs.push(Environment::new());
-    }
-
-    pub fn define(&mut self, name: &str, value: &RuntimeValue) {
-        // definition is always done in the current env.
-        if let Some(current_env) = self.envs.last_mut() {
-            current_env.define(name, value);
-        }
-    }
-
-    pub fn assign(&mut self, name: &str, value: &RuntimeValue) -> bool {
-        // assign the variable in the inner-most env
-        for env in self.envs.iter_mut().rev() {
-            if env.assign(name, value) {
-                return true;
-            }
-        }
-
-        false
-    }
-
-    pub fn get(&self, name: &str) -> Option<&RuntimeValue> {
+    pub fn get(&self, name: &str) -> Option<RuntimeValue> {
         // return the value in the inner-most env
-        for env in self.envs.iter().rev() {
-            let v = env.get(name);
-            if v.is_some() {
-                return v;
+        let v = self.bindings.get(name);
+        match v {
+            Some(inner) => Some(inner.clone()),
+            None => match &self.parent {
+                Some(p) => p.borrow().get(name),
+                None => None,
             }
         }
-
-        None
     }
 }
