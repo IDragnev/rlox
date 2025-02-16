@@ -9,6 +9,7 @@ use crate::{
     RuntimeValue,
     RuntimeError,
     is_truthy,
+    statement::StmtEffect,
 };
 use dumpster::{
     Trace,
@@ -31,7 +32,7 @@ unsafe impl Trace for Interpreter {
     }
 }
 
-pub type ExecResult = Result<(), RuntimeError>;
+pub type ExecResult = Result<Option<StmtEffect>, RuntimeError>;
 
 impl Interpreter {
     pub fn new() -> Self {
@@ -51,10 +52,17 @@ impl Interpreter {
 
     pub fn execute(&mut self, statements: &Vec<Box<dyn statement::Stmt>>) -> ExecResult {
         for s in statements.iter() {
-            self.execute_statement(s)?;
+            let effect = self.execute_statement(s)?;
+            match effect {
+                Some(StmtEffect::Break) |
+                Some(StmtEffect::Return(_)) => {
+                    return Ok(effect);
+                },
+                None => { },
+            }
         }
 
-        Ok(())
+        Ok(None)
     }
 
     pub fn execute_block(
@@ -80,14 +88,14 @@ impl Interpreter {
 impl statement::Visitor<ExecResult> for Interpreter {
     fn visit_expr(&mut self, s: &statement::Expression) -> ExecResult {
         self.evaluate_expr(&s.expr)
-            .map(|_| ())
+            .map(|_| None)
     }
 
     fn visit_print(&mut self, s: &statement::Print) -> ExecResult {
         let v = self.evaluate_expr(&s.expr)?;
         println!("{}", &v);
 
-        Ok(())
+        Ok(None)
     }
 
     fn visit_variable(&mut self, s: &statement::Variable) -> ExecResult {
@@ -100,7 +108,7 @@ impl statement::Visitor<ExecResult> for Interpreter {
 
         self.current_env.borrow_mut().define(&s.name.lexeme, &v);
 
-        Ok(())
+        Ok(None)
     }
 
     fn visit_block(&mut self, s: &statement::Block) -> ExecResult {
@@ -118,7 +126,7 @@ impl statement::Visitor<ExecResult> for Interpreter {
         else {
             match &s.else_branch {
                 Some(stmt) => self.execute_statement(stmt),
-                None => Ok(()),
+                None => Ok(None),
             }
         }
     }
@@ -128,14 +136,23 @@ impl statement::Visitor<ExecResult> for Interpreter {
             let cond = self.evaluate_expr(&s.cond)?;
 
             if is_truthy(&cond) {
-                self.execute_statement(&s.body)?;
+                let effect = self.execute_statement(&s.body)?;
+                match effect {
+                    Some(StmtEffect::Break) => {
+                        break;
+                    },
+                    Some(StmtEffect::Return(_)) => {
+                        return Ok(effect);
+                    },
+                    None => { },
+                }
             }
             else {
                 break;
             }
         }
 
-        Ok(())
+        Ok(None)
     }
 
     fn visit_function(&mut self, s: &statement::Function) -> ExecResult {
@@ -152,6 +169,21 @@ impl statement::Visitor<ExecResult> for Interpreter {
 
         self.current_env.borrow_mut().define(&s.name.lexeme, &value);
 
-        Ok(())
+        Ok(None)
+    }
+
+    fn visit_return(&mut self, s: &statement::Return) -> ExecResult {
+        let value = match &s.value {
+            Some(expr) => self.evaluate_expr(expr)?,
+            None => RuntimeValue::Nil,
+        };
+
+        Ok(Some(
+            StmtEffect::Return(value)
+        ))
+    }
+
+    fn visit_break(&mut self, _: &statement::Break) -> ExecResult {
+        Ok(Some(StmtEffect::Break))
     }
 }

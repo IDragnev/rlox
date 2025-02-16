@@ -192,6 +192,8 @@ impl Parser {
                 TokenType::For => self.parse_for_statement(iter),
                 TokenType::While => self.parse_while_statement(iter),
                 TokenType::Print => self.parse_print_statement(iter),
+                TokenType::Break => self.parse_break_statement(iter),
+                TokenType::Return => self.parse_return_statement(iter),
                 TokenType::LeftBrace => self.parse_block_statement(iter),
                 _ => self.parse_expr_statement(iter),
             }
@@ -213,6 +215,38 @@ impl Parser {
 
         Ok(Box::new(statement::Print{
             expr,
+        }))
+    }
+
+    fn parse_break_statement(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Stmt>, ParseError> {
+        let brk = self.consume_token(iter, TokenType::Break)?;
+        let _ = self.consume_token(iter, TokenType::Semicolon)?;
+
+        Ok(Box::new(statement::Break{
+            keyword: brk,
+        }))
+    }
+
+    fn parse_return_statement(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Stmt>, ParseError> {
+        let ret = self.consume_token(iter, TokenType::Return)?;
+
+        let mut value = None;
+        if let Err(_) = self.consume_token(iter, TokenType::Semicolon) {
+            let expr = self.parse_expr(iter)?;
+            value = Some(expr);
+
+            let _ = self.consume_token(iter, TokenType::Semicolon)?;
+        }
+
+        Ok(Box::new(statement::Return{
+            keyword: ret,
+            value,
         }))
     }
 

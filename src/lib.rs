@@ -5,6 +5,7 @@ pub mod statement;
 pub mod interpreter;
 
 use scanner::Token;
+use statement::StmtEffect;
 use std::fmt::Display;
 use dumpster::unsync::Gc;
 use interpreter::env::Environment;
@@ -101,9 +102,12 @@ impl Callable for Function {
             fun_env.borrow_mut().define(name, a);
         }
 
-        // todo: Return statements
-        let _ = interp.execute_block(&self.decl.body, fun_env)?;
-        Ok(RuntimeValue::Nil)
+        let effect = interp.execute_block(&self.decl.body, fun_env)?;
+        match effect {
+            Some(StmtEffect::Break) => panic!("break propagated to fuction"),
+            Some(StmtEffect::Return(v)) => return Ok(v),
+            None => return Ok(RuntimeValue::Nil),
+        }
     }
 }
 

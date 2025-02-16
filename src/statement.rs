@@ -1,4 +1,9 @@
-use crate::{expression::Expr, scanner::Token, RuntimeError};
+use crate::{
+    expression::Expr,
+    scanner::Token,
+    RuntimeError,
+    RuntimeValue,
+};
 
 #[derive(Clone)]
 pub struct Expression {
@@ -41,6 +46,17 @@ pub struct Function {
     pub body: Vec<Box<dyn Stmt>>,
 }
 
+#[derive(Clone)]
+pub struct Break {
+    pub keyword: Token,
+}
+
+#[derive(Clone)]
+pub struct Return {
+    pub keyword: Token,
+    pub value: Option<Box<dyn Expr>>,
+}
+
 pub trait Visitor<T> {
     fn visit_expr(&mut self, s: &Expression) -> T;
     fn visit_print(&mut self, s: &Print) -> T;
@@ -48,10 +64,18 @@ pub trait Visitor<T> {
     fn visit_block(&mut self, s: &Block) -> T;
     fn visit_if(&mut self, s: &If) -> T;
     fn visit_while(&mut self, s: &While) -> T;
+    fn visit_break(&mut self, s: &Break) -> T;
+    fn visit_return(&mut self, s: &Return) -> T;
     fn visit_function(&mut self, s: &Function) -> T;
 }
 
-type ExecResult = Result<(), RuntimeError>;
+#[derive(Clone)]
+pub enum StmtEffect {
+    Return(RuntimeValue),
+    Break,
+}
+
+type ExecResult = Result<Option<StmtEffect>, RuntimeError>;
 
 pub trait Stmt: dyn_clone::DynClone {
     fn accept_exec(&self, v: &mut dyn Visitor<ExecResult>) -> ExecResult;
@@ -98,5 +122,17 @@ impl Stmt for While {
 impl Stmt for Function {
     fn accept_exec(&self, v: &mut dyn Visitor<ExecResult>) -> ExecResult {
         v.visit_function(self)
+    }
+}
+
+impl Stmt for Break {
+    fn accept_exec(&self, v: &mut dyn Visitor<ExecResult>) -> ExecResult {
+        v.visit_break(self)
+    }
+}
+
+impl Stmt for Return {
+    fn accept_exec(&self, v: &mut dyn Visitor<ExecResult>) -> ExecResult {
+        v.visit_return(self)
     }
 }
