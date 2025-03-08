@@ -3,6 +3,8 @@ mod error;
 use rlox::{
     interpreter::Interpreter,
     parser::Parser,
+    resolver::Resolver,
+    statement::Stmt,
     scanner,
     statement,
 };
@@ -29,10 +31,16 @@ fn main() -> Result<(), Error> {
         let filename = args[1].clone();
 
         let contents = read_file(&PathBuf::from(filename))?;
-        if let Some(stmts) = scan_parse(&contents) {
+
+        if let Some(mut stmts) = scan_parse(&contents) {
+            let mut resolver = Resolver::new();
+            if resolve(&mut resolver, &mut stmts) == false {
+                std::process::exit(1);
+            }
+
             let mut interp = Interpreter::new();
             if let Err(e) =  interp.execute(&stmts) {
-                println!("Runtime error: {:?}", e);
+                println!("Runtime error: {:#?}", e);
                 std::process::exit(70);
             }
         }
@@ -54,6 +62,7 @@ fn read_file(filename: &PathBuf) -> Result<String, Error> {
 
 fn repl() -> Result<(), Error> {
     let mut interp = Interpreter::new();
+    let mut resolver = Resolver::new();
 
     loop {
         let mut input = String::new();
@@ -69,25 +78,32 @@ fn repl() -> Result<(), Error> {
             // If this fails, try to parse statements.
             let parser = Parser::new(&tokens);
             match parser.parse_single_expr() {
-                Ok(expr) => {
-                    match interp.evaluate_expr(&expr) {
-                        Ok(v) => {
-                            println!("{}", &v);
-                        },
-                        Err(e) => {
-                            println!("Error: {:?}", e);
+                Ok(mut expr) => {
+                    if let Err(e) = resolver.resolve_single_expr(&mut expr) {
+                        println!("Error: {:#?}", e);
+                    }
+                    else {
+                        match interp.evaluate_expr(&expr) {
+                            Ok(v) => {
+                                println!("{}", &v);
+                            },
+                            Err(e) => {
+                                println!("Error: {:#?}", e);
+                            }
                         }
                     }
                 }
                 Err(_) => {
                     match parser.parse() {
-                        Ok(statements) => {
-                            if let Err(e) =  interp.execute(&statements) {
-                                println!("Error: {:?}", e);
+                        Ok(mut statements) => {
+                            if resolve(&mut resolver, &mut statements) {
+                                if let Err(e) =  interp.execute(&statements) {
+                                    println!("Error: {:#?}", e);
+                                }
                             }
                         },
                         Err(errs) => {
-                            println!("Parse error: {:?}", errs);
+                            println!("Parse error: {:#?}", errs);
                         }
                     }
                 }
@@ -99,6 +115,15 @@ fn repl() -> Result<(), Error> {
     Ok(())
 }
 
+fn resolve(r: &mut Resolver, stmts: &mut Vec<Box<dyn Stmt>>) -> bool {
+    if let Err(errs) = r.resolve(stmts) {
+        println!("Compile errors: {:#?}", errs);
+        return false;
+    }
+    
+    true
+}
+
 fn scan_parse(input: &str) -> Option<Vec<Box<dyn statement::Stmt>>> {
     if let Some(tokens) = scan_input(&input) {
         let parser = Parser::new(&tokens);
@@ -107,7 +132,7 @@ fn scan_parse(input: &str) -> Option<Vec<Box<dyn statement::Stmt>>> {
                 return Some(statements)
             },
             Err(errs) => {
-                println!("Parse error: {:?}", errs);
+                println!("Parse error: {:#?}", errs);
             }
         }
     }
@@ -119,7 +144,7 @@ fn scan_input(input: &str) -> Option<Vec<scanner::Token>> {
     match scanner::scan(&input) {
         Ok(tokens) => Some(tokens),
         Err(e) => {
-            println!("Scan error: {:?}", e);
+            println!("Scan error: {:#?}", e);
             None
         }
     }

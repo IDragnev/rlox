@@ -3,6 +3,7 @@ pub mod expression;
 pub mod parser;
 pub mod statement;
 pub mod interpreter;
+pub mod resolver;
 
 use scanner::Token;
 use statement::StmtEffect;
@@ -53,6 +54,8 @@ pub enum RuntimeError {
         found: usize,
     },
 }
+
+pub type RuntimeResult = Result<RuntimeValue, RuntimeError>;
 
 pub fn is_truthy(value: &RuntimeValue) -> bool {
     match value {

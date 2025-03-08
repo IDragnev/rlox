@@ -445,6 +445,7 @@ impl Parser {
                 Ok(Box::new(Assignment {
                     name,
                     value: right,
+                    hops: None,
                 }))
             }
             else {
@@ -738,7 +739,8 @@ impl Parser {
                 },
                 TokenType::Identifier => {
                     return Ok(Box::new(Variable {
-                        name: token.clone()
+                        name: token.clone(),
+                        hops: None,
                     }));
                 },
                 _ => {

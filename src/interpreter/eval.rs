@@ -163,11 +163,7 @@ impl expression::Visitor<EvalResult> for Interpreter {
         &mut self,
         e: &expression::Variable,
     ) -> EvalResult {
-        self.current_env
-            .borrow()
-            .get(&e.name.lexeme)
-            .ok_or(RuntimeError::UndefinedVariable(e.name.clone()))
-            .map(|v| v.clone())
+        self.look_up_var(&e.name, e.hops)
     }
 
     fn visit_assignment(
@@ -175,7 +171,8 @@ impl expression::Visitor<EvalResult> for Interpreter {
         e: &expression::Assignment,
     ) -> EvalResult {
         let v = self.evaluate_expr(&e.value)?;
-        let var_exists = self.current_env.borrow_mut().assign(&e.name.lexeme, &v);
+
+        let var_exists = self.assign_var(&e.name, &v, e.hops);
         if var_exists {
             Ok(v)
         }

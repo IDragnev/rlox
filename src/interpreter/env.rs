@@ -54,28 +54,38 @@ impl Environment {
     }
 
     pub fn assign(&mut self, name: &str, value: &RuntimeValue) -> bool {
-        // assign the variable in the inner-most env
         match self.bindings.get_mut(name) {
             Some(entry) => {
                 *entry = value.clone();
                 true
             },
-            None => {
-                match &mut self.parent {
-                    Some(p) => p.borrow_mut().assign(name, value),
-                    None => false,
-                }
-            },
+            None => false,
+        }
+    }
+
+    pub fn assign_at(&mut self, name: &str, value: &RuntimeValue,  hops: usize) -> bool {
+        if hops == 0 {
+            self.assign(name, value)
+        }
+        else {
+            match &mut self.parent {
+                Some(p) => p.borrow_mut().assign_at(name, value, hops - 1),
+                None => false,
+            }
         }
     }
 
     pub fn get(&self, name: &str) -> Option<RuntimeValue> {
-        // return the value in the inner-most env
-        let v = self.bindings.get(name);
-        match v {
-            Some(inner) => Some(inner.clone()),
-            None => match &self.parent {
-                Some(p) => p.borrow().get(name),
+        self.bindings.get(name).map(|v| v.clone())
+    }
+
+    pub fn get_at(&self, name: &str, hops: usize) -> Option<RuntimeValue> {
+        if hops == 0 {
+            self.get(name)
+        }
+        else {
+            match &self.parent {
+                Some(p) => p.borrow().get_at(name, hops - 1),
                 None => None,
             }
         }

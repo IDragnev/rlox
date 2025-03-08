@@ -10,6 +10,7 @@ use crate::{
     RuntimeError,
     is_truthy,
     statement::StmtEffect,
+    scanner::Token,
 };
 use dumpster::{
     Trace,
@@ -82,6 +83,39 @@ impl Interpreter {
 
     fn execute_statement(&mut self, s: &Box<dyn statement::Stmt>) -> ExecResult {
         s.accept_exec(self)
+    }
+
+    fn look_up_var(&self, name: &Token, hops: Option<usize>) -> Result<RuntimeValue, RuntimeError> {
+        let value = match hops {
+            Some(h) => {
+                self.current_env
+                    .borrow()
+                    .get_at(&name.lexeme, h)
+            },
+            None => {
+                self.globals_env
+                    .borrow()
+                    .get(&name.lexeme)
+            }
+        };
+
+        value.ok_or(RuntimeError::UndefinedVariable(name.clone()))
+             .map(|v| v.clone())
+    }
+
+    fn assign_var(&mut self, name: &Token, value: &RuntimeValue, hops: Option<usize>) -> bool {
+        match hops {
+            Some(h) => {
+                self.current_env
+                    .borrow_mut()
+                    .assign_at(&name.lexeme, value, h)
+            },
+            None => {
+                self.globals_env
+                    .borrow_mut()
+                    .assign(&name.lexeme, value)
+            }
+        }
     }
 }
 
