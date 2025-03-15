@@ -17,15 +17,24 @@ enum VarInitializerState {
     Resolved,
 }
 
+#[derive(Copy, Clone, PartialEq)]
+enum Context {
+    Function,
+    Loop,
+}
+
 pub struct Resolver {
     scopes: Vec<HashMap<String, VarInitializerState>>,
     errors: Vec<ResolutionError>,
+    context: Vec<Context>,
 }
 
 #[derive(Debug, Clone)]
 pub enum ResolutionError {
     VariableAlreadyDeclared(Token),
     CantReadLocalVarInItsInitializer(Token),
+    ReturnNotInFunction(Token),
+    BreakNotInLoop(Token),
 }
 
 impl Resolver {
@@ -33,6 +42,7 @@ impl Resolver {
         Self {
             scopes: Vec::new(),
             errors: Vec::new(),
+            context: Vec::new(),
         }
     }
 
@@ -188,9 +198,13 @@ impl statement::MutVisitor<()> for Resolver {
     }
 
     fn visit_function(&mut self, s: &mut statement::Function) {
+        self.context.push(Context::Function);
+
         self.declare(&s.name);
         self.define(&s.name);
-        self.resolve_function(s)
+        self.resolve_function(s);
+
+        self.context.pop();
     }
 
     fn visit_expr(&mut self, s: &mut statement::Expression) {
@@ -211,17 +225,45 @@ impl statement::MutVisitor<()> for Resolver {
     }
 
     fn visit_return(&mut self, s: &mut statement::Return) {
+        let inside_fun = self.context.iter()
+            .copied()
+            .rev()
+            .find(|&c| c == Context::Function)
+            .is_some();
+        if inside_fun == false {
+            self.add_err(ResolutionError::ReturnNotInFunction(s.keyword.clone()));
+            return;
+        }
+
         if let Some(e) = &mut s.value {
             self.resolve_expr(e);
         }
     }
 
-    fn visit_break(&mut self, _: &mut statement::Break) {
+    fn visit_break(&mut self, s: &mut statement::Break) {
+        for c in self.context.iter().copied().rev() {
+            match c {
+                Context::Function => {
+                    // we have a function before a loop in the context
+                    self.add_err(ResolutionError::BreakNotInLoop(s.keyword.clone()));
+                    return;
+                },
+                Context::Loop => {
+                    return;
+                }
+            }
+        }
+
+        self.add_err(ResolutionError::BreakNotInLoop(s.keyword.clone()));
     }
 
     fn visit_while(&mut self, s: &mut statement::While) {
+        self.context.push(Context::Loop);
+
         self.resolve_expr(&mut s.cond);
-        self.resolve_stmt(&mut s.body)
+        self.resolve_stmt(&mut s.body);
+
+        self.context.pop();
     }
 }
 
