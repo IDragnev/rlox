@@ -119,7 +119,7 @@ fn resolve(r: &mut Resolver, stmts: &mut Vec<Box<dyn Stmt>>) -> bool {
     let result = r.resolve(stmts);
 
     if let Some(warning) = result.warnings {
-        println!("Warnings: {:#?}", warning);
+        report_warnings(&warning);
     }
 
     if let Some(errs) = result.errors {
@@ -251,6 +251,18 @@ fn report_parse_errors(errs: &Vec<rlox::parser::ParseError>) {
             }
             else {
                 println!("Error: {}", msg);
+            }
+        }
+    }
+}
+
+fn report_warnings(warnings: &Vec<rlox::resolver::Warning>) {
+    use rlox::resolver::Warning;
+
+    for w in warnings {
+        match w {
+            Warning::UnusedLocalVar(v) => {
+                println!("Warning: Unused local variable {} at line {}, column {}", v.lexeme, v.line, v.column);
             }
         }
     }
