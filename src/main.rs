@@ -150,8 +150,30 @@ fn scan_input(input: &str) -> Option<Vec<scanner::Token>> {
     match scanner::scan(&input) {
         Ok(tokens) => Some(tokens),
         Err(e) => {
-            println!("Scan error: {:#?}", e);
+            report_scan_errors(&e);
             None
         }
+    }
+}
+
+fn report_scan_errors(e: &rlox::scanner::ScanError) {
+    use scanner::ScanError;
+    use scanner::TokenErrorType;
+
+    println!("Scanner error.");
+
+    match e {
+        ScanError::NonAsciiCharacterFound => {
+            println!("Only ASCII characters are supported.");
+        },
+        ScanError::TokenError(token_errs) => {
+            for te in token_errs {
+                let err_type = match te.error {
+                    TokenErrorType::UnexpectedCharacter => "Unexpected character found.",
+                    TokenErrorType::UnterminatedString => "Unterminated string.",
+                };
+                println!("Error at line {}, column {}: {}", te.line, te.column, err_type);
+            }
+        },
     }
 }

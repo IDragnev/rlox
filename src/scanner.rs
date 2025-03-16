@@ -62,18 +62,33 @@ pub struct Token {
     pub token_type: TokenType,
     pub lexeme: String,
     pub literal: Option<Literal>,
+    pub line: u64,
+    pub column: u64,
 }
 
 impl Token {
-    pub fn single_character(token_type: TokenType, c: char) -> Self {
+    pub fn single_character(
+        token_type: TokenType,
+        c: char,
+        line: u64,
+        column: u64,
+    ) -> Self {
         Token {
             token_type,
             lexeme: c.to_string(),
             literal: None,
+            line,
+            column,
         }
     }
 
-    pub fn two_character(token_type: TokenType, c1: char, c2: char) -> Self {
+    pub fn two_character(
+        token_type: TokenType,
+        c1: char,
+        c2: char,
+        line: u64,
+        column: u64,
+    ) -> Self {
         let mut lexeme = c1.to_string();
         lexeme.push(c2);
 
@@ -81,15 +96,17 @@ impl Token {
             token_type,
             lexeme,
             literal: None,
+            line,
+            column,
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct TokenError {
-    line: u64,
-    column: u64,
-    error: TokenErrorType,
+    pub line: u64,
+    pub column: u64,
+    pub error: TokenErrorType,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -101,15 +118,6 @@ pub enum TokenErrorType {
 pub enum ScanError {
     NonAsciiCharacterFound,
     TokenError(Vec<TokenError>)
-}
-
-impl std::fmt::Debug for ScanError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::NonAsciiCharacterFound => write!(f, "Non-ascii character found."),
-            Self::TokenError(v) => write!(f, "Token errors: {:?}", v),
-        }
-    }
 }
 
 pub fn scan(source: &str) -> Result<Vec<Token>, ScanError> {
@@ -186,7 +194,7 @@ fn scan_ascii_line(
     let mut push_error = |l, c, e| { 
         error_result.push(TokenError {
             line: l + 1,
-            column: (c + 1) as u64,
+            column: c + 1,
             error: e,
         })
     };
@@ -198,71 +206,72 @@ fn scan_ascii_line(
         }
 
         let (col, c) = current.unwrap();
+        let col = col as u64;
         match c {
             '(' => {
-                push_token(Token::single_character(TokenType::LeftParen,  c))
+                push_token(Token::single_character(TokenType::LeftParen,  c, line_num, col))
             },
             ')' => {
-                push_token(Token::single_character(TokenType::RightParen, c))
+                push_token(Token::single_character(TokenType::RightParen, c, line_num, col))
             },
             '{' => {
-                push_token(Token::single_character(TokenType::LeftBrace, c))
+                push_token(Token::single_character(TokenType::LeftBrace, c, line_num, col))
             },
             '}' => {
-                push_token(Token::single_character(TokenType::RightBrace, c))
+                push_token(Token::single_character(TokenType::RightBrace, c, line_num, col))
             },
             ',' => {
-                push_token(Token::single_character(TokenType::Comma, c))
+                push_token(Token::single_character(TokenType::Comma, c, line_num, col))
             },
             '.' => {
-                push_token(Token::single_character(TokenType::Dot, c))
+                push_token(Token::single_character(TokenType::Dot, c, line_num, col))
             },
             '-' => {
-                push_token(Token::single_character(TokenType::Minus, c))
+                push_token(Token::single_character(TokenType::Minus, c, line_num, col))
             },
             '+' => {
-                push_token(Token::single_character(TokenType::Plus, c))
+                push_token(Token::single_character(TokenType::Plus, c, line_num, col))
             },
             ';' => {
-                push_token(Token::single_character(TokenType::Semicolon, c))
+                push_token(Token::single_character(TokenType::Semicolon, c, line_num, col))
             },
             '*' => {
-                push_token(Token::single_character(TokenType::Star, c))
+                push_token(Token::single_character(TokenType::Star, c, line_num, col))
             },
             '!' => {
                 if let Some(&(_, '=')) = chars.peek() {
                     let (_, cc) = chars.next().unwrap();
-                    push_token(Token::two_character(TokenType::BangEqual, c, cc));
+                    push_token(Token::two_character(TokenType::BangEqual, c, cc, line_num, col));
                 }
                 else {
-                    push_token(Token::single_character(TokenType::Bang, c));
+                    push_token(Token::single_character(TokenType::Bang, c, line_num, col));
                 }
             },
             '=' => {
                 if let Some(&(_, '=')) = chars.peek() {
                     let (_, cc) = chars.next().unwrap();
-                    push_token(Token::two_character(TokenType::EqualEqual, c, cc));
+                    push_token(Token::two_character(TokenType::EqualEqual, c, cc, line_num, col));
                 }
                 else {
-                    push_token(Token::single_character(TokenType::Equal, c));
+                    push_token(Token::single_character(TokenType::Equal, c, line_num, col));
                 }
             },
             '<' => {
                 if let Some(&(_, '=')) = chars.peek() {
                     let (_, cc) = chars.next().unwrap();
-                    push_token(Token::two_character(TokenType::LessEqual, c, cc));
+                    push_token(Token::two_character(TokenType::LessEqual, c, cc, line_num, col));
                 }
                 else {
-                    push_token(Token::single_character(TokenType::Less, c));
+                    push_token(Token::single_character(TokenType::Less, c, line_num, col));
                 }
             },
             '>' => {
                 if let Some(&(_, '=')) = chars.peek() {
                     let (_, cc) = chars.next().unwrap();
-                    push_token(Token::two_character(TokenType::GreaterEqual, c, cc));
+                    push_token(Token::two_character(TokenType::GreaterEqual, c, cc, line_num, col));
                 }
                 else {
-                    push_token(Token::single_character(TokenType::Greater, c));
+                    push_token(Token::single_character(TokenType::Greater, c, line_num, col));
                 }
             },
             '/' => {
@@ -271,7 +280,7 @@ fn scan_ascii_line(
                     break;
                 }
                 else {
-                    push_token(Token::single_character(TokenType::Slash, c));
+                    push_token(Token::single_character(TokenType::Slash, c, line_num, col));
                 }
             },
             '\t'|'\r'|' ' => {
@@ -297,6 +306,8 @@ fn scan_ascii_line(
                         token_type: TokenType::String,
                         lexeme,
                         literal: Some(Literal::String(literal)),
+                        line: line_num + 1,
+                        column: col + 1,
                     })
                 }
             },
@@ -332,8 +343,9 @@ fn scan_ascii_line(
                         token_type: TokenType::Number,
                         lexeme: lexeme,
                         literal: Some(Literal::Number(value)),
+                        line: line_num + 1,
+                        column: col + 1,
                     });
-
                 }
                 else if is_ascii_alpha(c) {
                     let mut lexeme = c.to_string();
@@ -350,6 +362,8 @@ fn scan_ascii_line(
                         token_type,
                         lexeme,
                         literal: None,
+                        line: line_num + 1,
+                        column: col + 1,
                     })
                 } 
                 else {
