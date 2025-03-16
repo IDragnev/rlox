@@ -7,6 +7,7 @@ use rlox::{
     statement::Stmt,
     scanner,
     statement,
+    RuntimeError,
 };
 use std::{
     env, 
@@ -40,7 +41,7 @@ fn main() -> Result<(), Error> {
 
             let mut interp = Interpreter::new();
             if let Err(e) =  interp.execute(&stmts) {
-                println!("Runtime error: {:#?}", e);
+                report_runtime_error(&e);
                 std::process::exit(70);
             }
         }
@@ -88,7 +89,7 @@ fn repl() -> Result<(), Error> {
                                 println!("{}", &v);
                             },
                             Err(e) => {
-                                println!("Error: {:#?}", e);
+                                report_runtime_error(&e);
                             }
                         }
                     }
@@ -98,7 +99,7 @@ fn repl() -> Result<(), Error> {
                         Ok(mut statements) => {
                             if resolve(&mut resolver, &mut statements) {
                                 if let Err(e) =  interp.execute(&statements) {
-                                    println!("Error: {:#?}", e);
+                                    report_runtime_error(&e);
                                 }
                             }
                         },
@@ -295,4 +296,53 @@ fn report_resolution_errors(errs: &Vec<rlox::resolver::ResolutionError>) {
 
         println!("Compile Error: {}, line {}, column {}.", err_msg, line, col);
     }
+}
+
+fn report_runtime_error(err: &RuntimeError) {
+    let (msg, line, col) = match err {
+        RuntimeError::UnknownUnaryExpression(token) => {
+            ("Unknown unary expression".to_owned(), token.line, token.column)
+        },
+        RuntimeError::UnknownBinaryExpression(token) => {
+            ("Unknown binary expression".to_owned(), token.line, token.column)
+        },
+        RuntimeError::UnaryMinusExpectsNumber(token) => {
+            ("Unary '-' expects number".to_owned(), token.line, token.column)
+        },
+        RuntimeError::BinaryOperatorExpectsNumbers(token) => {
+            (format!("Operator '{:?}' expects numbers", token.token_type),
+             token.line,
+             token.column,
+            )
+        },
+        RuntimeError::BinaryPlusExpectsTwoNumbersOrTwoStrings(token) => {
+            ("'+' expects two numbers or two strings".to_owned(),
+             token.line,
+             token.column,
+            )
+        },
+        RuntimeError::DivisionByZero(token) => {
+            ("Division by zero".to_owned(), token.line, token.column)
+        },
+        RuntimeError::UndefinedVariable(token) => {
+            (format!("Undefined variable '{}'", token.lexeme),
+             token.line,
+             token.column,
+            )
+        },
+        RuntimeError::NonCallableCalled(token) => {
+            ("Non-callable called".to_owned(), token.line, token.column)
+        },
+        RuntimeError::CallableArityMismatch { right_paren, expected, found } => {
+            (format!(
+                "Arity mismatch. Expected {} arguments, found {}",
+                expected,
+                found),
+             right_paren.line,
+             right_paren.column,
+            )
+        },
+    };
+
+    println!("Runtime error: {}, line {}, column {}.", msg, line, col);
 }
