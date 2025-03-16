@@ -80,7 +80,7 @@ fn repl() -> Result<(), Error> {
             match parser.parse_single_expr() {
                 Ok(mut expr) => {
                     if let Err(e) = resolver.resolve_single_expr(&mut expr) {
-                        println!("Error: {:#?}", e);
+                        report_resolution_errors(&e);
                     }
                     else {
                         match interp.evaluate_expr(&expr) {
@@ -123,7 +123,7 @@ fn resolve(r: &mut Resolver, stmts: &mut Vec<Box<dyn Stmt>>) -> bool {
     }
 
     if let Some(errs) = result.errors {
-        println!("Compile errors: {:#?}", errs);
+        report_resolution_errors(&errs);
         return false;
     }
     
@@ -262,8 +262,37 @@ fn report_warnings(warnings: &Vec<rlox::resolver::Warning>) {
     for w in warnings {
         match w {
             Warning::UnusedLocalVar(v) => {
-                println!("Warning: Unused local variable {} at line {}, column {}", v.lexeme, v.line, v.column);
+                println!("Warning: Unused local variable '{}' at line {}, column {}", v.lexeme, v.line, v.column);
             }
         }
+    }
+}
+
+fn report_resolution_errors(errs: &Vec<rlox::resolver::ResolutionError>) {
+    use rlox::resolver::ResolutionError;
+
+    for e in errs {
+        let (err_msg, line, col) = match e {
+            ResolutionError::BreakNotInLoop(err) => {
+                ("'break' outside loop".to_owned(), err.line, err.column)
+            },
+            ResolutionError::CantReadLocalVarInItsInitializer(err) => {
+                ("Can't read a local variable in its initializer".to_owned(),
+                 err.line,
+                 err.column,
+                )
+            },
+            ResolutionError::ReturnNotInFunction(err) => {
+                ("'return' outside function".to_owned(), err.line, err.column)
+            },
+            ResolutionError::VariableAlreadyDeclared(err) => {
+                (format!("Variable '{}' already declared", err.lexeme),
+                 err.line,
+                 err.column,
+                )
+            }
+        };
+
+        println!("Compile Error: {}, line {}, column {}.", err_msg, line, col);
     }
 }
