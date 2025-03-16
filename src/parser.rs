@@ -32,8 +32,8 @@ pub enum ParseErrorType {
 
 #[derive(Clone, Debug)]
 pub struct ParseError {
-    error_type: ParseErrorType,
-    // to do - add error location info
+    pub error_type: ParseErrorType,
+    pub token: Option<Token>,
 }
 
 pub struct Parser {
@@ -90,7 +90,8 @@ impl Parser {
         }
         else {
             Err(ParseError {
-                error_type: ParseErrorType::ExpectedExpression
+                error_type: ParseErrorType::ExpectedExpression,
+                token: self.tokens.first().map(|t| t.clone()),
             })
         }
     }
@@ -200,7 +201,8 @@ impl Parser {
         }
         else {
             Err(ParseError {
-                error_type: ParseErrorType::ExpectedStatement
+                error_type: ParseErrorType::ExpectedStatement,
+                token: None,
             })
         }
     }
@@ -293,12 +295,13 @@ impl Parser {
         iter: &mut Peekable<Iter<'_, Token>>,
     ) -> Result<Box<dyn Stmt>, ParseError> {
         let _ = self.consume_token(iter, TokenType::For)?;
-        let _ = self.consume_token(iter, TokenType::LeftParen)?;
+        let left_paren = self.consume_token(iter, TokenType::LeftParen)?;
 
         let initializer = match iter.peek() {
             None => {
                 return Err(ParseError {
-                    error_type: ParseErrorType::ExpectedForLoopInitializerOrSemiColon
+                    error_type: ParseErrorType::ExpectedForLoopInitializerOrSemiColon,
+                    token: Some(left_paren.clone()),
                 })
             },
             Some(&token) => match token.token_type {
@@ -314,7 +317,8 @@ impl Parser {
         let cond = match iter.peek() {
             None => {
                 return Err(ParseError {
-                    error_type: ParseErrorType::ExpectedForLoopConditionOrSemiColon
+                    error_type: ParseErrorType::ExpectedForLoopConditionOrSemiColon,
+                    token: Some(left_paren.clone()),
                 })
             },
             Some(&token) => match token.token_type {
@@ -436,7 +440,7 @@ impl Parser {
     ) -> Result<Box<dyn Expr>, ParseError> {
         let left = self.parse_logic_or(iter)?;
 
-        if let Some(_eq) = iter.next_if(|t| t.token_type == TokenType::Equal) {
+        if let Some(eq) = iter.next_if(|t| t.token_type == TokenType::Equal) {
             let right = self.parse_assignment(iter)?;
 
             // as of now only simple variables can be assigned to,
@@ -450,7 +454,8 @@ impl Parser {
             }
             else {
                 Err(ParseError {
-                    error_type: ParseErrorType::InvalidAssignment
+                    error_type: ParseErrorType::InvalidAssignment,
+                    token: Some(eq.clone()),
                 })
             }
         }
@@ -745,14 +750,16 @@ impl Parser {
                 },
                 _ => {
                     return Err(ParseError {
-                        error_type: ParseErrorType::ExpectedExpression
+                        error_type: ParseErrorType::ExpectedExpression,
+                        token: Some(token.clone()),
                     });
                 }
             }
         }
 
         return Err(ParseError {
-            error_type: ParseErrorType::ExpectedExpression
+            error_type: ParseErrorType::ExpectedExpression,
+            token: None,
         });
     }
 
@@ -768,10 +775,11 @@ impl Parser {
             let found = iter.peek().map(|&found| found.token_type);
 
             Err(ParseError {
+                token: iter.peek().map(|&t| t.clone()),
                 error_type: ParseErrorType::ExpectedToken {
                     expected,
                     found,
-                }
+                },
             })
         }
     }

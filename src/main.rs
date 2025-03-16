@@ -103,7 +103,7 @@ fn repl() -> Result<(), Error> {
                             }
                         },
                         Err(errs) => {
-                            println!("Parse error: {:#?}", errs);
+                            report_parse_errors(&errs);
                         }
                     }
                 }
@@ -138,7 +138,7 @@ fn scan_parse(input: &str) -> Option<Vec<Box<dyn statement::Stmt>>> {
                 return Some(statements)
             },
             Err(errs) => {
-                println!("Parse error: {:#?}", errs);
+                report_parse_errors(&errs);
             }
         }
     }
@@ -175,5 +175,83 @@ fn report_scan_errors(e: &rlox::scanner::ScanError) {
                 println!("Error at line {}, column {}: {}", te.line, te.column, err_type);
             }
         },
+    }
+}
+
+fn report_parse_errors(errs: &Vec<rlox::parser::ParseError>) {
+    use rlox::parser::ParseErrorType;
+
+    println!("Parse error.");
+
+    for e in errs {
+        let mut line = None;
+        let mut column = None;
+        let mut err_type = None;
+        let _ = err_type.is_some(); // silence warning
+
+        match e.error_type {
+            ParseErrorType::ExpectedExpression => {
+                if let Some(t) = &e.token {
+                    line = Some(t.line);
+                    column = Some(t.column);
+                }
+                err_type = Some("Expected expression.".to_owned());
+            },
+            ParseErrorType::ExpectedForLoopInitializerOrSemiColon => {
+                if let Some(t) = &e.token {
+                    line = Some(t.line);
+                    column = Some(t.column + 1);
+                }
+                err_type = Some("Expected for loop initializer or semicolon.".to_owned());
+            },
+            ParseErrorType::ExpectedForLoopConditionOrSemiColon => {
+                if let Some(t) = &e.token {
+                    line = Some(t.line);
+                    column = Some(t.column);
+                }
+                err_type = Some("Expected for loop condition or semicolon after initializer.".to_owned());
+            },
+            ParseErrorType::ExpectedStatement => {
+                if let Some(t) = &e.token {
+                    line = Some(t.line);
+                    column = Some(t.column);
+                }
+                err_type = Some("Expected statement.".to_owned());
+            },
+            ParseErrorType::ExpectedToken { expected, found } => {
+                if let Some(t) = &e.token {
+                    line = Some(t.line);
+                    column = Some(t.column);
+                }
+
+                if found.is_some() {
+                    err_type = Some(format!("Expected {:?}, found {:?}.", expected, found.unwrap()));
+                }
+                else {
+                    err_type = Some(format!("Expected {:?}.", expected));
+                }
+            },
+            ParseErrorType::InvalidAssignment => {
+                if let Some(t) = &e.token {
+                    line = Some(t.line);
+                    column = Some(t.column);
+                }
+                err_type = Some("Invalid assignment.".to_owned());
+            },
+        }
+
+        if let Some(msg) = err_type {
+            if line.is_some() && column.is_some() {
+                println!(
+                    "Error at line {}, column {}: {}",
+                    line.unwrap(),
+                    column.unwrap(),
+                    msg,
+                );
+            }
+            else {
+                println!("Error: {}", msg);
+            }
+        }
     }
 }
