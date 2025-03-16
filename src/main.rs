@@ -116,7 +116,13 @@ fn repl() -> Result<(), Error> {
 }
 
 fn resolve(r: &mut Resolver, stmts: &mut Vec<Box<dyn Stmt>>) -> bool {
-    if let Err(errs) = r.resolve(stmts) {
+    let result = r.resolve(stmts);
+
+    if let Some(warning) = result.warnings {
+        println!("Warnings: {:#?}", warning);
+    }
+
+    if let Some(errs) = result.errors {
         println!("Compile errors: {:#?}", errs);
         return false;
     }

@@ -11,10 +11,17 @@ use crate::{
 };
 use std::collections::HashMap;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 enum VarInitializerState {
     Unresolved,
     Resolved,
+}
+
+#[derive(Clone)]
+struct LocalVarState {
+    var_name: Token,
+    init_state: VarInitializerState,
+    used: bool,
 }
 
 #[derive(Copy, Clone, PartialEq)]
@@ -24,8 +31,9 @@ enum Context {
 }
 
 pub struct Resolver {
-    scopes: Vec<HashMap<String, VarInitializerState>>,
+    scopes: Vec<HashMap<String, LocalVarState>>,
     errors: Vec<ResolutionError>,
+    warnings: Vec<Warning>,
     context: Vec<Context>,
 }
 
@@ -37,17 +45,29 @@ pub enum ResolutionError {
     BreakNotInLoop(Token),
 }
 
+#[derive(Debug, Clone)]
+pub enum Warning {
+    UnusedLocalVar(Token),
+}
+
+pub struct ResolutionResult {
+    pub warnings: Option<Vec<Warning>>,
+    pub errors: Option<Vec<ResolutionError>>,
+}
+
 impl Resolver {
     pub fn new() -> Self {
         Self {
             scopes: Vec::new(),
             errors: Vec::new(),
+            warnings: Vec::new(),
             context: Vec::new(),
         }
     }
 
     pub fn resolve_single_expr(&mut self, expr: &mut Box<dyn Expr>) -> Result<(), Vec<ResolutionError>> {
         self.resolve_expr(expr);
+        self.warnings.clear();
 
         if self.errors.len() > 0 {
             Err(self.errors.drain(..).collect())
@@ -57,15 +77,26 @@ impl Resolver {
         }
     }
 
-    pub fn resolve(&mut self, stmts: &mut Vec<Box<dyn Stmt>>) -> Result<(), Vec<ResolutionError>> {
+    pub fn resolve(&mut self, stmts: &mut Vec<Box<dyn Stmt>>) -> ResolutionResult {
         self.resolve_stmts(stmts);
 
+        let mut result = ResolutionResult {
+            warnings: None,
+            errors: None,
+        };
+
+        if self.warnings.len() > 0 {
+            result.warnings = Some(
+                self.warnings.drain(..).collect(),
+            );
+        }
         if self.errors.len() > 0 {
-            Err(self.errors.drain(..).collect())
+            result.errors = Some(
+                self.errors.drain(..).collect(),
+            );
         }
-        else {
-            Ok(())
-        }
+
+        result
     }
 
     fn resolve_stmts(&mut self, stmts: &mut Vec<Box<dyn Stmt>>) {
@@ -87,7 +118,20 @@ impl Resolver {
     }
 
     fn end_scope(&mut self) {
+        self.check_for_unused_locals();
         self.scopes.pop();
+    }
+
+    fn check_for_unused_locals(&mut self) {
+        if let Some(scope) = self.scopes.last() {
+            for local_var in scope.iter() {
+                if local_var.1.used == false {
+                    self.warnings.push(
+                        Warning::UnusedLocalVar(local_var.1.var_name.clone())
+                    );
+                }
+            }
+        }
     }
 
     fn add_err(&mut self, e: ResolutionError) {
@@ -101,7 +145,14 @@ impl Resolver {
                     self.add_err(ResolutionError::VariableAlreadyDeclared(name.clone()));
                 }
                 else {
-                    scope.insert(name.lexeme.clone(), VarInitializerState::Unresolved);
+                    scope.insert(
+                        name.lexeme.clone(),
+                        LocalVarState {
+                            var_name: name.clone(),
+                            init_state: VarInitializerState::Unresolved,
+                            used: false
+                        }
+                    );
                 }
             }
             None => {},
@@ -110,14 +161,25 @@ impl Resolver {
 
     fn define(&mut self, name: &Token) {
         if let Some(scope) = self.scopes.last_mut() {
-            scope.insert(name.lexeme.clone(), VarInitializerState::Resolved);
+            scope.insert(
+                name.lexeme.clone(),
+                LocalVarState {
+                    var_name: name.clone(),
+                    init_state: VarInitializerState::Resolved,
+                    used: false
+                }
+            );
         }
     }
 
     fn resolve_local(&mut self, name: &Token) -> Option<usize> {
-        for (i, scope) in self.scopes.iter().rev().enumerate() {
-            if scope.contains_key(&name.lexeme) {
-                return Some(i);
+        for (i, scope) in self.scopes.iter_mut().rev().enumerate() {
+            match scope.get_mut(&name.lexeme) {
+                Some(var_state) => {
+                    var_state.used = true;
+                    return Some(i);
+                },
+                None => {},
             }
         }
 
@@ -138,9 +200,11 @@ impl Resolver {
 impl expression::MutVisitor<()> for Resolver {
     fn visit_variable(&mut self, e: &mut expression::Variable) {
         if let Some(scope) = self.scopes.last() {
-            if let Some(VarInitializerState::Unresolved) = scope.get(&e.name.lexeme) {
-                self.add_err(ResolutionError::CantReadLocalVarInItsInitializer(e.name.clone()));
-                return;
+            if let Some(var_state) = scope.get(&e.name.lexeme) {
+                if var_state.init_state == VarInitializerState::Unresolved {
+                    self.add_err(ResolutionError::CantReadLocalVarInItsInitializer(e.name.clone()));
+                    return;
+                }
             }
         }
 
