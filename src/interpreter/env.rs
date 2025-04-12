@@ -22,11 +22,7 @@ unsafe impl Trace for Environment {
         }
 
         for (_, value) in &self.bindings {
-            if let RuntimeValue::Callable { callable: _, closure } = value {
-                if let Some(cl) = closure {
-                    cl.accept(visitor)?;
-                }
-            }
+            value.accept(visitor)?;
         }
 
         Ok(())

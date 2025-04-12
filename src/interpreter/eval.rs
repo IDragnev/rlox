@@ -7,6 +7,7 @@ use crate::{
     RuntimeValue,
     RuntimeError,
     is_truthy,
+    Callable,
 };
 use super::Interpreter;
 
@@ -184,24 +185,59 @@ impl expression::Visitor<EvalResult> for Interpreter {
     fn visit_call(&mut self, e: &expression::Call) -> EvalResult {
         let value = self.evaluate_expr(&e.callee)?;
 
-        if let RuntimeValue::Callable{ callable, closure } = value {
-            if callable.arity() != e.args.len() {
-                return Err(RuntimeError::CallableArityMismatch {
-                    right_paren: e.right_paren.clone(),
-                    expected: callable.arity(),
-                    found: e.args.len(),
-                });
-            }
+        match value {
+            RuntimeValue::Callable{ callable, closure } => {
+                if callable.arity() != e.args.len() {
+                    return Err(RuntimeError::CallableArityMismatch {
+                        right_paren: e.right_paren.clone(),
+                        expected: callable.arity(),
+                        found: e.args.len(),
+                    });
+                }
 
-            let mut args = Vec::new();
-            for a in &e.args {
-                args.push(self.evaluate_expr(a)?);
-            }
+                let mut args = Vec::new();
+                for a in &e.args {
+                    args.push(self.evaluate_expr(a)?);
+                }
 
-            callable.call(&args, self, &closure)
+                callable.call(&args, self, &closure)
+            },
+            RuntimeValue::Class(class) => {
+                class.call(&vec![], self, &None)
+            },
+            _ => {
+                Err(RuntimeError::NonCallableCalled(e.right_paren.clone()))
+            },
+        }
+    }
+
+    fn visit_get(&mut self, e: &expression::Get) -> EvalResult {
+        let expr = self.evaluate_expr(&e.object)?;
+
+        if let RuntimeValue::Instance(instance) = expr {
+            instance.borrow()
+                .get(&e.name.lexeme)
+                .ok_or(RuntimeError::UndefinedProperty(e.name.clone()))
         }
         else {
-            Err(RuntimeError::NonCallableCalled(e.right_paren.clone()))
+            Err(RuntimeError::OnlyInstancesHaveProperties(
+                e.name.clone(),
+            ))
+        }
+    }
+
+    fn visit_set(&mut self, e: &expression::Set) -> EvalResult {
+        let expr = self.evaluate_expr(&e.object)?;
+
+        if let RuntimeValue::Instance(instance) = expr {
+            let v = self.evaluate_expr(&e.value)?;
+            instance.borrow_mut().set(&e.name.lexeme, &v);
+            Ok(v)
+        }
+        else {
+            Err(RuntimeError::OnlyInstancesHaveProperties(
+                e.name.clone(),
+            ))
         }
     }
 }

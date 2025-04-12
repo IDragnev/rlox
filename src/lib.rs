@@ -11,6 +11,7 @@ use std::fmt::Display;
 use dumpster::unsync::Gc;
 use interpreter::env::Environment;
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 pub trait Callable: dyn_clone::DynClone + Display {
     fn arity(&self) -> usize;
@@ -36,6 +37,8 @@ pub enum RuntimeValue {
         // then `Callable` cannot be made into an object
         closure: Option<Gc<RefCell<Environment>>>,
     },
+    Class(Class),
+    Instance(Gc<RefCell<Instance>>),
 }
 
 #[derive(Debug)]
@@ -53,6 +56,8 @@ pub enum RuntimeError {
         expected: usize,
         found: usize,
     },
+    OnlyInstancesHaveProperties(Token),
+    UndefinedProperty(Token),
 }
 
 pub type RuntimeResult = Result<RuntimeValue, RuntimeError>;
@@ -68,6 +73,73 @@ pub fn is_truthy(value: &RuntimeValue) -> bool {
 #[derive(Clone)]
 pub struct Function {
     pub decl: statement::Function,
+}
+
+#[derive(Clone)]
+pub struct Class {
+    pub name: String,
+}
+
+impl Class {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_owned(),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Instance {
+    class: Class,
+    fields: HashMap<String, RuntimeValue>, 
+}
+
+impl Instance {
+    pub fn new(class: &Class) -> Self {
+        Self {
+            class: class.clone(),
+            fields: HashMap::new(),
+        }
+    }
+
+    pub fn get(&self, name: &str) -> Option<RuntimeValue> {
+        self.fields.get(name).map(|f| f.clone())
+    }
+
+    pub fn set(&mut self, name: &str, v: &RuntimeValue) {
+        self.fields.insert(name.to_owned(), v.clone());
+    }
+}
+
+impl Display for Class {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<class {}>", &self.name)
+    }
+}
+
+impl Display for Instance {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<instance of class {}>", &self.class.name)
+    }
+}
+
+impl Callable for Class {
+    fn arity(&self) -> usize {
+        0
+    }
+
+    fn call(
+            &self,
+            _args: &Vec<RuntimeValue>,
+            _interp: &mut interpreter::Interpreter,
+            _closure: &Option<Gc<RefCell<Environment>>>,
+        ) -> Result<RuntimeValue, RuntimeError> {
+        let instance = Instance::new(self);
+
+        Ok(RuntimeValue::Instance(
+            Gc::new(RefCell::new(instance))
+        ))
+    }
 }
 
 impl Display for Function {
@@ -121,7 +193,37 @@ impl Display for RuntimeValue {
             RuntimeValue::Bool(b) => write!(f, "{}", b),
             RuntimeValue::Number(n) => write!(f, "{}", n),
             RuntimeValue::String(s) => write!(f, "\"{}\"", s),
-            RuntimeValue::Callable{ closure: _, callable } => callable.fmt(f)
+            RuntimeValue::Callable{ closure: _, callable } => callable.fmt(f),
+            RuntimeValue::Class(c) => c.fmt(f),
+            RuntimeValue::Instance(i) => i.borrow().fmt(f),
         }
+    }
+}
+
+unsafe impl dumpster::Trace for RuntimeValue {
+    fn accept<V: dumpster::Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
+        match self {
+            RuntimeValue::Callable { callable: _, closure } => {
+                if let Some(cl) = closure {
+                    cl.accept(visitor)?
+                }
+            },
+            RuntimeValue::Instance(instance) => {
+                instance.accept(visitor)?
+            },
+            _ => {},
+        }
+
+        Ok(())
+    }
+}
+
+unsafe impl dumpster::Trace for Instance {
+    fn accept<V: dumpster::Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
+        for (_, value) in &self.fields {
+            value.accept(visitor)?;
+        }
+
+        Ok(())
     }
 }

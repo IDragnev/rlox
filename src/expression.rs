@@ -58,6 +58,19 @@ pub struct Call {
     pub args: Vec<Box<dyn Expr>>,
 }
 
+#[derive(Clone)]
+pub struct Get {
+    pub name: Token,
+    pub object: Box<dyn Expr>,
+}
+
+#[derive(Clone)]
+pub struct Set {
+    pub name: Token,
+    pub object: Box<dyn Expr>,
+    pub value: Box<dyn Expr>,
+}
+
 pub trait Visitor<T> {
     fn visit_literal(&mut self, e: &Literal) -> T;
     fn visit_unary(&mut self, e: &Unary) -> T;
@@ -67,6 +80,8 @@ pub trait Visitor<T> {
     fn visit_variable(&mut self, e: &Variable) -> T;
     fn visit_assignment(&mut self, e: &Assignment) -> T;
     fn visit_call(&mut self, e: &Call) -> T;
+    fn visit_get(&mut self, e: &Get) -> T;
+    fn visit_set(&mut self, e: &Set) -> T;
 }
 
 pub trait MutVisitor<T> {
@@ -78,11 +93,23 @@ pub trait MutVisitor<T> {
     fn visit_variable(&mut self, e: &mut Variable) -> T;
     fn visit_assignment(&mut self, e: &mut Assignment) -> T;
     fn visit_call(&mut self, e: &mut Call) -> T;
+    fn visit_get(&mut self, e: &mut Get) -> T;
+    fn visit_set(&mut self, e: &mut Set) -> T;
+}
+
+pub enum AssignTarget {
+    Var {
+        name: Token,
+    },
+    Get {
+        object: Box<dyn Expr>,
+        name: Token,
+    },
 }
 
 pub trait Expr: dyn_clone::DynClone {
-    // only valid for `Variable`. Temporary workaround for assignment parsing.
-    fn var_name(&self) -> Option<Token> { None }
+    // workaround for assignment parsing
+    fn as_assign_target(&self) -> Option<AssignTarget> { None }
 
     fn accept_string(&self, v: &mut dyn Visitor<String>) -> String;
     fn accept_rt_value(&self, v: &mut dyn Visitor<RuntimeResult>) -> RuntimeResult;
@@ -140,8 +167,8 @@ impl Expr for Grouping {
 }
 
 impl Expr for Variable {
-    fn var_name(&self) -> Option<Token> {
-        Some(self.name.clone())
+    fn as_assign_target(&self) -> Option<AssignTarget> {
+        Some(AssignTarget::Var { name: self.name.clone() })
     }
 
     fn accept_string(&self, v: &mut dyn Visitor<String>) -> String {
@@ -190,5 +217,37 @@ impl Expr for Call {
     }
     fn accept_resolve(&mut self, v: &mut dyn MutVisitor<()>) {
         v.visit_call(self)
+    }
+}
+
+impl Expr for Get {
+    fn accept_string(&self, v: &mut dyn Visitor<String>) -> String {
+        v.visit_get(self)
+    }
+
+    fn accept_rt_value(&self, v: &mut dyn Visitor<RuntimeResult>) -> RuntimeResult {
+        v.visit_get(self)
+    }
+    fn accept_resolve(&mut self, v: &mut dyn MutVisitor<()>) {
+        v.visit_get(self)
+    }
+    fn as_assign_target(&self) -> Option<AssignTarget> {
+        Some(AssignTarget::Get {
+            name: self.name.clone(),
+            object: self.object.clone(),
+        })
+    }
+}
+
+impl Expr for Set {
+    fn accept_string(&self, v: &mut dyn Visitor<String>) -> String {
+        v.visit_set(self)
+    }
+
+    fn accept_rt_value(&self, v: &mut dyn Visitor<RuntimeResult>) -> RuntimeResult {
+        v.visit_set(self)
+    }
+    fn accept_resolve(&mut self, v: &mut dyn MutVisitor<()>) {
+        v.visit_set(self)
     }
 }

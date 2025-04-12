@@ -239,6 +239,13 @@ fn report_parse_errors(errs: &Vec<rlox::parser::ParseError>) {
                 }
                 err_type = Some("Invalid assignment.".to_owned());
             },
+            ParseErrorType::ExpectedRightBraceAfterClassBody => {
+                if let Some(t) = &e.token {
+                    line = Some(t.line);
+                    column = Some(t.column);
+                }
+                err_type = Some("Expected } after class body.".to_owned());
+            }
         }
 
         if let Some(msg) = err_type {
@@ -340,6 +347,18 @@ fn report_runtime_error(err: &RuntimeError) {
                 found),
              right_paren.line,
              right_paren.column,
+            )
+        },
+        RuntimeError::OnlyInstancesHaveProperties(token) => {
+            ("Only instances have properties".to_owned(),
+             token.line,
+             token.column,
+            )
+        },
+        RuntimeError::UndefinedProperty(token) => {
+            (format!("Undefined property '{}'", &token.lexeme),
+             token.line,
+             token.column,
             )
         },
     };

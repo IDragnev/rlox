@@ -12,8 +12,13 @@ use crate::expression::{
     Assignment,
     Logical,
     Call,
+    Get,
+    Set,
 };
-use crate::statement::{self, Stmt};
+use crate::statement::{
+    self,
+    Stmt,
+};
 use std::iter::Peekable;
 use core::slice::Iter;
 
@@ -28,6 +33,7 @@ pub enum ParseErrorType {
     InvalidAssignment,
     ExpectedForLoopInitializerOrSemiColon,
     ExpectedForLoopConditionOrSemiColon,
+    ExpectedRightBraceAfterClassBody,
 }
 
 #[derive(Clone, Debug)]
@@ -104,6 +110,7 @@ impl Parser {
             match token.token_type {
                 TokenType::Var => self.parse_var_decl(iter),
                 TokenType::Fun => self.parse_fun_decl(iter),
+                TokenType::Class => self.parse_class_decl(iter),
                 _ => self.parse_statement(iter),
             }
         }
@@ -112,18 +119,56 @@ impl Parser {
         }
     }
 
+    fn parse_class_decl(
+        &self,
+        iter: &mut Peekable<Iter<'_, Token>>,
+    ) -> Result<Box<dyn Stmt>, ParseError> {
+        let _ = self.consume_token(iter, TokenType::Class)?;
+        let name = self.consume_token(iter, TokenType::Identifier)?;
+        let _ = self.consume_token(iter, TokenType::LeftBrace)?;
+
+        let mut methods = Vec::new();
+        loop {
+            match iter.peek() {
+                None => {
+                    return Err(ParseError { 
+                        error_type: ParseErrorType::ExpectedRightBraceAfterClassBody,
+                        token: None,
+                    })
+                },
+                Some(t) => {
+                    if t.token_type == TokenType::RightBrace {
+                        break;
+                    }
+                }
+            }
+
+            let f = self.parse_function(iter)?;
+            methods.push(f);
+        }
+
+        let _ = self.consume_token(iter, TokenType::RightBrace)?;
+
+        Ok(Box::new(statement::Class {
+            name,
+            methods,
+        }))
+    }
+
     fn parse_fun_decl(
         &self,
         iter: &mut Peekable<Iter<'_, Token>>,
     ) -> Result<Box<dyn Stmt>, ParseError> {
         let _ = self.consume_token(iter, TokenType::Fun)?;
-        self.parse_function(iter)
+
+        let f = self.parse_function(iter)?;
+        Ok(Box::new(f))
     }
 
     fn parse_function(
         &self,
         iter: &mut Peekable<Iter<'_, Token>>,
-    ) -> Result<Box<dyn Stmt>, ParseError> {
+    ) -> Result<statement::Function, ParseError> {
         // todo: add context to consume_token so error messages
         // are more specific -> 'expected function name' instead of
         // 'expected identifier'.
@@ -133,11 +178,11 @@ impl Parser {
         let _ = self.consume_token(iter, TokenType::RightParen)?;
         let body = self.parse_block(iter)?;
 
-        Ok(Box::new(statement::Function {
+        Ok(statement::Function {
             name,
             params,
             body,
-        }))
+        })
     }
 
     fn parse_params(
@@ -443,14 +488,24 @@ impl Parser {
         if let Some(eq) = iter.next_if(|t| t.token_type == TokenType::Equal) {
             let right = self.parse_assignment(iter)?;
 
-            // as of now only simple variables can be assigned to,
-            // needs to be fixed when classes & member variables are introduced
-            if let Some(name) = left.var_name() {
-                Ok(Box::new(Assignment {
-                    name,
-                    value: right,
-                    hops: None,
-                }))
+            use crate::expression::AssignTarget;
+            if let Some(target) = left.as_assign_target() {
+                match target {
+                    AssignTarget::Var { name } => {
+                        Ok(Box::new(Assignment {
+                            name,
+                            value: right,
+                            hops: None,
+                        }))
+                    },
+                    AssignTarget::Get { object, name } => {
+                        Ok(Box::new(Set {
+                            name,
+                            object,
+                            value: right,
+                        }))
+                    }
+                }
             }
             else {
                 Err(ParseError {
@@ -670,7 +725,15 @@ impl Parser {
                         callee: expr,
                         args,
                     })
-                }
+                },
+                TokenType::Dot => {
+                    let _ = self.consume_token(iter, TokenType::Dot)?;
+                    let name = self.consume_token(iter, TokenType::Identifier)?;
+                    expr = Box::new(Get {
+                        name,
+                        object: expr,
+                    })
+                },
                 _ => break,
             }
         }

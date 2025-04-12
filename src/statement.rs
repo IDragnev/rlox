@@ -57,6 +57,12 @@ pub struct Return {
     pub value: Option<Box<dyn Expr>>,
 }
 
+#[derive(Clone)]
+pub struct Class {
+    pub name: Token,
+    pub methods: Vec<Function>,
+}
+
 pub trait Visitor<T> {
     fn visit_expr(&mut self, s: &Expression) -> T;
     fn visit_print(&mut self, s: &Print) -> T;
@@ -67,6 +73,7 @@ pub trait Visitor<T> {
     fn visit_break(&mut self, s: &Break) -> T;
     fn visit_return(&mut self, s: &Return) -> T;
     fn visit_function(&mut self, s: &Function) -> T;
+    fn visit_class(&mut self, s: &Class) -> T;
 }
 
 pub trait MutVisitor<T> {
@@ -79,6 +86,7 @@ pub trait MutVisitor<T> {
     fn visit_break(&mut self, s: &mut Break) -> T;
     fn visit_return(&mut self, s: &mut Return) -> T;
     fn visit_function(&mut self, s: &mut Function) -> T;
+    fn visit_class(&mut self, s: &mut Class) -> T;
 }
 
 #[derive(Clone)]
@@ -174,5 +182,14 @@ impl Stmt for Return {
     }
     fn accept_resolve(&mut self, v: &mut dyn MutVisitor<()>) {
         v.visit_return(self)
+    }
+}
+
+impl Stmt for Class {
+    fn accept_exec(&self, v: &mut dyn Visitor<ExecResult>) -> ExecResult {
+        v.visit_class(self)
+    }
+    fn accept_resolve(&mut self, v: &mut dyn MutVisitor<()>) {
+        v.visit_class(self)
     }
 }

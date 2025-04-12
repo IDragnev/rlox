@@ -244,6 +244,14 @@ impl expression::MutVisitor<()> for Resolver {
     fn visit_literal(&mut self, _: &mut expression::Literal) {
     }
 
+    fn visit_get(&mut self, e: &mut expression::Get) {
+        self.resolve_expr(&mut e.object)
+    }
+
+    fn visit_set(&mut self, e: &mut expression::Set) {
+        self.resolve_expr(&mut e.object);
+        self.resolve_expr(&mut e.value);
+    }
 }
 
 impl statement::MutVisitor<()> for Resolver {
@@ -328,6 +336,14 @@ impl statement::MutVisitor<()> for Resolver {
         self.resolve_stmt(&mut s.body);
 
         self.context.pop();
+    }
+
+    fn visit_class(&mut self, s: &mut statement::Class) {
+        // allow storing a class as a local variable
+        self.declare(&s.name);
+        self.define(&s.name);
+
+        // resolve methods
     }
 }
 

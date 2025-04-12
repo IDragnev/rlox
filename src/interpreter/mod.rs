@@ -11,6 +11,7 @@ use crate::{
     is_truthy,
     statement::StmtEffect,
     scanner::Token,
+    Class,
 };
 use dumpster::{
     Trace,
@@ -219,5 +220,13 @@ impl statement::Visitor<ExecResult> for Interpreter {
 
     fn visit_break(&mut self, _: &statement::Break) -> ExecResult {
         Ok(Some(StmtEffect::Break))
+    }
+
+    fn visit_class(&mut self, s: &statement::Class) -> ExecResult {
+        self.current_env.borrow_mut().define(&s.name.lexeme, &RuntimeValue::Nil);
+        let class =  RuntimeValue::Class(Class::new(&s.name.lexeme));
+        self.current_env.borrow_mut().assign(&s.name.lexeme, &class);
+
+        Ok(None)
     }
 }
