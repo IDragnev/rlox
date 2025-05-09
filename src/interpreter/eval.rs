@@ -170,6 +170,10 @@ impl expression::Visitor<EvalResult> for Interpreter {
         self.look_up_var(&e.name, e.hops)
     }
 
+    fn visit_this(&mut self, e: &expression::This) -> EvalResult {
+        self.look_up_var(&e.keyword, e.hops)
+    }
+
     fn visit_assignment(
         &mut self,
         e: &expression::Assignment,
@@ -224,7 +228,7 @@ impl expression::Visitor<EvalResult> for Interpreter {
 
         if let RuntimeValue::Instance(instance) = expr {
             instance.borrow()
-                .get(&e.name.lexeme)
+                .get(&e.name.lexeme, &instance)
                 .ok_or(RuntimeError::UndefinedProperty(e.name.clone()))
         }
         else {

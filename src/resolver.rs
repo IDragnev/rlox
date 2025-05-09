@@ -7,7 +7,10 @@ use crate::{
         self,
         Stmt,
     },
-    scanner::Token,
+    scanner::{
+        TokenType,
+        Token,
+    },
 };
 use std::collections::HashMap;
 
@@ -173,6 +176,28 @@ impl Resolver {
         }
     }
 
+    fn define_this(&mut self) {
+        let name = Token {
+            token_type: TokenType::This,
+            lexeme: "this".to_owned(),
+            literal: None,
+            line: 0,
+            column: 0,
+        };
+
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.insert(
+                name.lexeme.clone(),
+                LocalVarState {
+                    var_name: name.clone(),
+                    init_state: VarInitializerState::Resolved,
+                    used: true, // must not emit a warning
+                }
+            );
+        }
+    }
+
+    
     fn resolve_local(&mut self, name: &Token) -> Option<usize> {
         for (i, scope) in self.scopes.iter_mut().rev().enumerate() {
             match scope.get_mut(&name.lexeme) {
@@ -252,6 +277,10 @@ impl expression::MutVisitor<()> for Resolver {
     fn visit_set(&mut self, e: &mut expression::Set) {
         self.resolve_expr(&mut e.object);
         self.resolve_expr(&mut e.value);
+    }
+
+    fn visit_this(&mut self, e: &mut expression::This) {
+        e.hops = self.resolve_local(&e.keyword);
     }
 }
 
@@ -343,6 +372,9 @@ impl statement::MutVisitor<()> for Resolver {
         self.declare(&s.name);
         self.define(&s.name);
 
+        self.begin_scope();
+        self.define_this();
+
         for m in &mut s.methods {
             self.context.push(Context::Method);
 
@@ -352,6 +384,8 @@ impl statement::MutVisitor<()> for Resolver {
 
             self.context.pop();
         }
+
+        self.end_scope();
     }
 }
 

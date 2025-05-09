@@ -14,6 +14,7 @@ use crate::expression::{
     Call,
     Get,
     Set,
+    This,
 };
 use crate::statement::{
     self,
@@ -810,6 +811,12 @@ impl Parser {
                         name: token.clone(),
                         hops: None,
                     }));
+                },
+                TokenType::This => {
+                    return Ok(Box::new(This {
+                        keyword: token.clone(),
+                        hops: None,
+                    }))
                 },
                 _ => {
                     return Err(ParseError {

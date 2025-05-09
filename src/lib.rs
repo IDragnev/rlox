@@ -107,7 +107,7 @@ impl Instance {
         }
     }
 
-    pub fn get(&self, name: &str) -> Option<RuntimeValue> {
+    pub fn get(&self, name: &str, self_ptr: &Gc<RefCell<Instance>>) -> Option<RuntimeValue> {
         let v = self.fields.get(name).map(|f| f.clone());
         if v.is_some() {
             return v;
@@ -117,11 +117,33 @@ impl Instance {
             .borrow()
             .methods
             .get(name)
-            .map(|m| RuntimeValue::Callable(m.clone()))
+            .map(|m| {
+                RuntimeValue::Callable(bind_method(m, self_ptr))
+            })
     }
 
     pub fn set(&mut self, name: &str, v: &RuntimeValue) {
         self.fields.insert(name.to_owned(), v.clone());
+    }
+}
+
+fn bind_method(
+    callable_wrapper: &CallableWrapper,
+    instance: &Gc<RefCell<Instance>>,
+) -> CallableWrapper {
+    let mut env = match &callable_wrapper.closure {
+        Some(closure) => Environment::child(closure.clone()),
+        None => {
+            panic!("Trying to bind a global function.");
+        }
+    };
+
+    env.define("this", &RuntimeValue::Instance(instance.clone()));
+    let env = Gc::new(RefCell::new(env));
+
+    CallableWrapper {
+        closure: Some(env),
+        callable: callable_wrapper.callable.clone(),
     }
 }
 
