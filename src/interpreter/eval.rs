@@ -7,9 +7,11 @@ use crate::{
     RuntimeValue,
     RuntimeError,
     is_truthy,
-    Callable,
+    Instance,
     CallableWrapper,
 };
+use dumpster::unsync::Gc;
+use std::cell::RefCell;
 use super::Interpreter;
 
 type EvalResult = Result<RuntimeValue, RuntimeError>;
@@ -204,7 +206,12 @@ impl expression::Visitor<EvalResult> for Interpreter {
                 callable.call(&args, self, &closure)
             },
             RuntimeValue::Class(class) => {
-                class.borrow().call(&vec![], self, &None)
+                let instance = Instance::new(&class);
+                let v = RuntimeValue::Instance(
+                    Gc::new(RefCell::new(instance))
+                );
+
+                Ok(v)
             },
             _ => {
                 Err(RuntimeError::NonCallableCalled(e.right_paren.clone()))

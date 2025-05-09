@@ -95,12 +95,12 @@ impl Class {
 
 #[derive(Clone)]
 pub struct Instance {
-    class: Class, // todo - gc
+    class: Gc<RefCell<Class>>,
     fields: HashMap<String, RuntimeValue>, 
 }
 
 impl Instance {
-    pub fn new(class: &Class) -> Self {
+    pub fn new(class: &Gc<RefCell<Class>>) -> Self {
         Self {
             class: class.clone(),
             fields: HashMap::new(),
@@ -113,7 +113,11 @@ impl Instance {
             return v;
         }
 
-        self.class.methods.get(name).map(|m| RuntimeValue::Callable(m.clone()))
+        self.class
+            .borrow()
+            .methods
+            .get(name)
+            .map(|m| RuntimeValue::Callable(m.clone()))
     }
 
     pub fn set(&mut self, name: &str, v: &RuntimeValue) {
@@ -129,26 +133,7 @@ impl Display for Class {
 
 impl Display for Instance {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<instance of class {}>", &self.class.name)
-    }
-}
-
-impl Callable for Class {
-    fn arity(&self) -> usize {
-        0
-    }
-
-    fn call(
-            &self,
-            _args: &Vec<RuntimeValue>,
-            _interp: &mut interpreter::Interpreter,
-            _closure: &Option<Gc<RefCell<Environment>>>,
-        ) -> Result<RuntimeValue, RuntimeError> {
-        let instance = Instance::new(self);
-
-        Ok(RuntimeValue::Instance(
-            Gc::new(RefCell::new(instance))
-        ))
+        write!(f, "<instance of class {}>", &self.class.borrow().name)
     }
 }
 
