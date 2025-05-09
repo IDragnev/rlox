@@ -23,6 +23,14 @@ pub trait Callable: dyn_clone::DynClone + Display {
     ) -> Result<RuntimeValue, RuntimeError>;
 }
 
+#[derive(Clone)]
+pub struct CallableWrapper {
+    callable: Box<dyn Callable>,
+    // not behind a `Callable` implementation because
+    // then `Callable` cannot be made into an object
+    closure: Option<Gc<RefCell<Environment>>>,
+}
+
 dyn_clone::clone_trait_object!(Callable);
 
 #[derive(Clone)]
@@ -31,13 +39,8 @@ pub enum RuntimeValue {
     Bool(bool),
     Number(f64),
     String(String),
-    Callable {
-        callable: Box<dyn Callable>,
-        // not behind a `Callable` implementation because
-        // then `Callable` cannot be made into an object
-        closure: Option<Gc<RefCell<Environment>>>,
-    },
-    Class(Class),
+    Callable(CallableWrapper),
+    Class(Gc<RefCell<Class>>),
     Instance(Gc<RefCell<Instance>>),
 }
 
@@ -78,19 +81,21 @@ pub struct Function {
 #[derive(Clone)]
 pub struct Class {
     pub name: String,
+    pub methods: HashMap<String, CallableWrapper>,
 }
 
 impl Class {
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: &str, methods: HashMap<String, CallableWrapper>) -> Self {
         Self {
             name: name.to_owned(),
+            methods,
         }
     }
 }
 
 #[derive(Clone)]
 pub struct Instance {
-    class: Class,
+    class: Class, // todo - gc
     fields: HashMap<String, RuntimeValue>, 
 }
 
@@ -103,7 +108,12 @@ impl Instance {
     }
 
     pub fn get(&self, name: &str) -> Option<RuntimeValue> {
-        self.fields.get(name).map(|f| f.clone())
+        let v = self.fields.get(name).map(|f| f.clone());
+        if v.is_some() {
+            return v;
+        }
+
+        self.class.methods.get(name).map(|m| RuntimeValue::Callable(m.clone()))
     }
 
     pub fn set(&mut self, name: &str, v: &RuntimeValue) {
@@ -193,8 +203,8 @@ impl Display for RuntimeValue {
             RuntimeValue::Bool(b) => write!(f, "{}", b),
             RuntimeValue::Number(n) => write!(f, "{}", n),
             RuntimeValue::String(s) => write!(f, "\"{}\"", s),
-            RuntimeValue::Callable{ closure: _, callable } => callable.fmt(f),
-            RuntimeValue::Class(c) => c.fmt(f),
+            RuntimeValue::Callable(CallableWrapper { closure: _, callable }) => callable.fmt(f),
+            RuntimeValue::Class(c) => c.borrow().fmt(f),
             RuntimeValue::Instance(i) => i.borrow().fmt(f),
         }
     }
@@ -203,10 +213,8 @@ impl Display for RuntimeValue {
 unsafe impl dumpster::Trace for RuntimeValue {
     fn accept<V: dumpster::Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
         match self {
-            RuntimeValue::Callable { callable: _, closure } => {
-                if let Some(cl) = closure {
-                    cl.accept(visitor)?
-                }
+            RuntimeValue::Callable(c) => { 
+                c.accept(visitor)?
             },
             RuntimeValue::Instance(instance) => {
                 instance.accept(visitor)?
@@ -218,8 +226,29 @@ unsafe impl dumpster::Trace for RuntimeValue {
     }
 }
 
+unsafe impl dumpster::Trace for CallableWrapper {
+    fn accept<V: dumpster::Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
+        if let Some(cl) = &self.closure {
+            cl.accept(visitor)?
+        }
+        Ok(())
+    }
+}
+
+unsafe impl dumpster::Trace for Class {
+    fn accept<V: dumpster::Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
+        for (_, value) in &self.methods {
+            value.accept(visitor)?;
+        }
+
+        Ok(())
+    }
+}
+
 unsafe impl dumpster::Trace for Instance {
     fn accept<V: dumpster::Visitor>(&self, visitor: &mut V) -> Result<(), ()> {
+        self.class.accept(visitor)?;
+
         for (_, value) in &self.fields {
             value.accept(visitor)?;
         }

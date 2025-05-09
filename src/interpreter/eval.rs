@@ -8,6 +8,7 @@ use crate::{
     RuntimeError,
     is_truthy,
     Callable,
+    CallableWrapper,
 };
 use super::Interpreter;
 
@@ -186,7 +187,7 @@ impl expression::Visitor<EvalResult> for Interpreter {
         let value = self.evaluate_expr(&e.callee)?;
 
         match value {
-            RuntimeValue::Callable{ callable, closure } => {
+            RuntimeValue::Callable(CallableWrapper { callable, closure }) => {
                 if callable.arity() != e.args.len() {
                     return Err(RuntimeError::CallableArityMismatch {
                         right_paren: e.right_paren.clone(),
@@ -203,7 +204,7 @@ impl expression::Visitor<EvalResult> for Interpreter {
                 callable.call(&args, self, &closure)
             },
             RuntimeValue::Class(class) => {
-                class.call(&vec![], self, &None)
+                class.borrow().call(&vec![], self, &None)
             },
             _ => {
                 Err(RuntimeError::NonCallableCalled(e.right_paren.clone()))

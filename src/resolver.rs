@@ -27,6 +27,7 @@ struct LocalVarState {
 #[derive(Copy, Clone, PartialEq)]
 enum Context {
     Function,
+    Method,
     Loop,
 }
 
@@ -300,7 +301,7 @@ impl statement::MutVisitor<()> for Resolver {
         let inside_fun = self.context.iter()
             .copied()
             .rev()
-            .find(|&c| c == Context::Function)
+            .find(|&c| c == Context::Function || c == Context::Method)
             .is_some();
         if inside_fun == false {
             self.add_err(ResolutionError::ReturnNotInFunction(s.keyword.clone()));
@@ -315,8 +316,7 @@ impl statement::MutVisitor<()> for Resolver {
     fn visit_break(&mut self, s: &mut statement::Break) {
         for c in self.context.iter().copied().rev() {
             match c {
-                Context::Function => {
-                    // we have a function before a loop in the context
+                Context::Function | Context::Method => {
                     self.add_err(ResolutionError::BreakNotInLoop(s.keyword.clone()));
                     return;
                 },
@@ -343,7 +343,15 @@ impl statement::MutVisitor<()> for Resolver {
         self.declare(&s.name);
         self.define(&s.name);
 
-        // resolve methods
+        for m in &mut s.methods {
+            self.context.push(Context::Method);
+
+            // self.declare(&s.name);
+            // self.define(&s.name);
+            self.resolve_function(m);
+
+            self.context.pop();
+        }
     }
 }
 

@@ -12,13 +12,17 @@ use crate::{
     statement::StmtEffect,
     scanner::Token,
     Class,
+    CallableWrapper,
 };
 use dumpster::{
     Trace,
     unsync::Gc,
     Visitor,
 };
-use std::cell::RefCell;
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+};
 
 pub struct Interpreter {
     globals_env: Gc<RefCell<Environment>>,
@@ -197,10 +201,10 @@ impl statement::Visitor<ExecResult> for Interpreter {
         let callable: Box<dyn Callable> = Box::new(Function {
             decl: s.clone(),
         });
-        let value = RuntimeValue::Callable {
+        let value = RuntimeValue::Callable(CallableWrapper {
             callable: callable,
             closure: Some(closure)
-        };
+        });
 
         self.current_env.borrow_mut().define(&s.name.lexeme, &value);
 
@@ -223,8 +227,27 @@ impl statement::Visitor<ExecResult> for Interpreter {
     }
 
     fn visit_class(&mut self, s: &statement::Class) -> ExecResult {
+        use crate::{ Callable, Function };
+
         self.current_env.borrow_mut().define(&s.name.lexeme, &RuntimeValue::Nil);
-        let class =  RuntimeValue::Class(Class::new(&s.name.lexeme));
+
+        let mut class_methods: HashMap<String, CallableWrapper> = HashMap::new();
+        for f in &s.methods {
+            let closure = self.current_env.clone();
+            let callable: Box<dyn Callable> = Box::new(Function {
+                decl: f.clone(),
+            });
+            let method = CallableWrapper {
+                callable: callable,
+                closure: Some(closure)
+            };
+
+            class_methods.insert(f.name.lexeme.clone(), method);
+        }
+
+        let class =  RuntimeValue::Class(Gc::new(RefCell::new(
+            Class::new(&s.name.lexeme, class_methods)
+        )));
         self.current_env.borrow_mut().assign(&s.name.lexeme, &class);
 
         Ok(None)
