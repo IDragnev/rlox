@@ -32,6 +32,7 @@ enum Context {
     Function,
     Method,
     Loop,
+    Class,
 }
 
 pub struct Resolver {
@@ -47,6 +48,7 @@ pub enum ResolutionError {
     CantReadLocalVarInItsInitializer(Token),
     ReturnNotInFunction(Token),
     BreakNotInLoop(Token),
+    ThisNotInsideClass(Token),
 }
 
 #[derive(Debug, Clone)]
@@ -280,6 +282,11 @@ impl expression::MutVisitor<()> for Resolver {
     }
 
     fn visit_this(&mut self, e: &mut expression::This) {
+        if let None = self.context.iter().find(|&c| *c == Context::Class) {
+            self.add_err(ResolutionError::ThisNotInsideClass(e.keyword.clone()));
+            return;
+        }
+
         e.hops = self.resolve_local(&e.keyword);
     }
 }
@@ -351,7 +358,8 @@ impl statement::MutVisitor<()> for Resolver {
                 },
                 Context::Loop => {
                     return;
-                }
+                },
+                Context::Class => { },
             }
         }
 
@@ -368,6 +376,8 @@ impl statement::MutVisitor<()> for Resolver {
     }
 
     fn visit_class(&mut self, s: &mut statement::Class) {
+        self.context.push(Context::Class);
+
         // allow storing a class as a local variable
         self.declare(&s.name);
         self.define(&s.name);
@@ -382,10 +392,12 @@ impl statement::MutVisitor<()> for Resolver {
             // self.define(&s.name);
             self.resolve_function(m);
 
-            self.context.pop();
+            self.context.pop(); // method
         }
 
         self.end_scope();
+
+        self.context.pop(); // class
     }
 }
 

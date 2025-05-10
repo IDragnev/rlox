@@ -298,6 +298,12 @@ fn report_resolution_errors(errs: &Vec<rlox::resolver::ResolutionError>) {
                  err.line,
                  err.column,
                 )
+            },
+            ResolutionError::ThisNotInsideClass(err) => {
+                ("Can't use 'this' outside of a class".to_owned(),
+                 err.line,
+                 err.column,
+                )
             }
         };
 
