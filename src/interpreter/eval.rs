@@ -210,12 +210,38 @@ impl expression::Visitor<EvalResult> for Interpreter {
                 callable.call(&args, self, &closure)
             },
             RuntimeValue::Class(class) => {
-                let instance = Instance::new(&class);
-                let v = RuntimeValue::Instance(
-                    Gc::new(RefCell::new(instance))
-                );
+                let instance = Gc::new(RefCell::new(Instance::new(&class)));
 
-                Ok(v)
+                match class.borrow().methods.get("init") {
+                    Some(initializer) => {
+                        if initializer.callable.arity() != e.args.len() {
+                            return Err(RuntimeError::CallableArityMismatch {
+                                right_paren: e.right_paren.clone(),
+                                expected: initializer.callable.arity(),
+                                found: e.args.len(),
+                            });
+                        }
+
+                        let mut args = Vec::new();
+                        for a in &e.args {
+                            args.push(self.evaluate_expr(a)?);
+                        }
+
+                        let init = crate::bind_method(initializer, &instance);
+                        init.callable.call(&args, self, &init.closure)?;
+                    },
+                    None => {
+                        if e.args.len() != 0 {
+                            return Err(RuntimeError::CallableArityMismatch {
+                                right_paren: e.right_paren.clone(),
+                                expected: 0,
+                                found: e.args.len(),
+                            });
+                        }
+                    }
+                };
+
+                Ok(RuntimeValue::Instance(instance))
             },
             _ => {
                 Err(RuntimeError::NonCallableCalled(e.right_paren.clone()))

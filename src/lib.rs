@@ -127,7 +127,7 @@ impl Instance {
     }
 }
 
-fn bind_method(
+pub fn bind_method(
     callable_wrapper: &CallableWrapper,
     instance: &Gc<RefCell<Instance>>,
 ) -> CallableWrapper {
