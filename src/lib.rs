@@ -76,6 +76,7 @@ pub fn is_truthy(value: &RuntimeValue) -> bool {
 #[derive(Clone)]
 pub struct Function {
     pub decl: statement::Function,
+    is_initializer: bool,
 }
 
 #[derive(Clone)]
@@ -197,8 +198,40 @@ impl Callable for Function {
         let effect = interp.execute_block(&self.decl.body, fun_env)?;
         match effect {
             Some(StmtEffect::Break) => panic!("break propagated to fuction"),
-            Some(StmtEffect::Return(v)) => return Ok(v),
-            None => return Ok(RuntimeValue::Nil),
+            Some(StmtEffect::Return(v)) => {
+                if self.is_initializer {
+                    // workaround: initializer must always return 'this'
+                    if let Some(cl) = closure {
+                        let instance = cl.borrow()
+                            .get("this")
+                            .expect("initializer closure without 'this'");
+                        return Ok(instance);
+                    }
+                    else {
+                        panic!("initializer without closure");
+                    }
+                }
+                else {
+                    return Ok(v)
+                }
+            }
+            None => {
+                if self.is_initializer {
+                    // workaround: initializer must always return 'this'
+                    if let Some(cl) = closure {
+                        let instance = cl.borrow()
+                            .get("this")
+                            .expect("initializer closure without 'this'");
+                        return Ok(instance);
+                    }
+                    else {
+                        panic!("initializer without closure");
+                    }
+                }
+                else {
+                    return Ok(RuntimeValue::Nil)
+                }
+            }
         }
     }
 }

@@ -200,6 +200,7 @@ impl statement::Visitor<ExecResult> for Interpreter {
         let closure = self.current_env.clone();
         let callable: Box<dyn Callable> = Box::new(Function {
             decl: s.clone(),
+            is_initializer: false,
         });
         let value = RuntimeValue::Callable(CallableWrapper {
             callable: callable,
@@ -233,9 +234,11 @@ impl statement::Visitor<ExecResult> for Interpreter {
 
         let mut class_methods: HashMap<String, CallableWrapper> = HashMap::new();
         for f in &s.methods {
+            let is_initializer = f.name.lexeme == "init";
             let closure = self.current_env.clone();
             let callable: Box<dyn Callable> = Box::new(Function {
                 decl: f.clone(),
+                is_initializer,
             });
             let method = CallableWrapper {
                 callable: callable,

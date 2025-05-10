@@ -31,6 +31,7 @@ struct LocalVarState {
 enum Context {
     Function,
     Method,
+    InitializerMethod,
     Loop,
     Class,
 }
@@ -47,6 +48,7 @@ pub enum ResolutionError {
     VariableAlreadyDeclared(Token),
     CantReadLocalVarInItsInitializer(Token),
     ReturnNotInFunction(Token),
+    CantReturnValueFromAnInitializer(Token),
     BreakNotInLoop(Token),
     ThisNotInsideClass(Token),
 }
@@ -334,14 +336,22 @@ impl statement::MutVisitor<()> for Resolver {
     }
 
     fn visit_return(&mut self, s: &mut statement::Return) {
-        let inside_fun = self.context.iter()
+        let iter_fun_context = self.context
+            .iter()
             .copied()
             .rev()
-            .find(|&c| c == Context::Function || c == Context::Method)
-            .is_some();
+            .find(|&c| c == Context::Function || c == Context::Method || c == Context::InitializerMethod);
+        let inside_fun = iter_fun_context.is_some();
         if inside_fun == false {
             self.add_err(ResolutionError::ReturnNotInFunction(s.keyword.clone()));
             return;
+        }
+
+        if let Some(Context::InitializerMethod) = iter_fun_context {
+            if s.value.is_some() {
+                self.add_err(ResolutionError::CantReturnValueFromAnInitializer(s.keyword.clone()));
+                return;
+            }
         }
 
         if let Some(e) = &mut s.value {
@@ -352,7 +362,7 @@ impl statement::MutVisitor<()> for Resolver {
     fn visit_break(&mut self, s: &mut statement::Break) {
         for c in self.context.iter().copied().rev() {
             match c {
-                Context::Function | Context::Method => {
+                Context::Function | Context::Method | Context::InitializerMethod => {
                     self.add_err(ResolutionError::BreakNotInLoop(s.keyword.clone()));
                     return;
                 },
@@ -386,7 +396,14 @@ impl statement::MutVisitor<()> for Resolver {
         self.define_this();
 
         for m in &mut s.methods {
-            self.context.push(Context::Method);
+            let method_context = 
+                if m.name.lexeme != "init" {
+                    Context::Method
+                }
+                else {
+                    Context::InitializerMethod
+                };
+            self.context.push(method_context);
 
             // self.declare(&s.name);
             // self.define(&s.name);

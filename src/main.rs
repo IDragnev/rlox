@@ -304,6 +304,12 @@ fn report_resolution_errors(errs: &Vec<rlox::resolver::ResolutionError>) {
                  err.line,
                  err.column,
                 )
+            },
+            ResolutionError::CantReturnValueFromAnInitializer(err) => {
+                ("Can't return a value from an initializer".to_owned(),
+                 err.line,
+                 err.column,
+                )
             }
         };
 
