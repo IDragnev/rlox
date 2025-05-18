@@ -16,7 +16,7 @@ You can use the interpreter in [REPL](https://en.wikipedia.org/wiki/Read%E2%80%9
 - **string** - string literals are sequences of characters enclosed in double quotes, such as *"hello"*.
 - **functions** - Lox has [first-class functions](https://en.wikipedia.org/wiki/First-class_function). It supports passing functions as arguments to other functions, returning them as the values from other functions, and assigning them to variables.
 - **nil** - the **nil** type has a single value - *nil*. It represents the [null value](https://en.wikipedia.org/wiki/Nullable_type). It is the value of any uninitialized variable and the default return value of functions.
-- **classes** - classes and inheritance are coming soon.
+- **classes** - user defined types with methods and dynamic fields. Inheritance is coming soon.
 
 ## Working with values
 ### Variables and functions
@@ -124,3 +124,38 @@ print a; // "true";
 var b = true and 1 and nil and 1;
 print b; // nil
 ```
+
+#### Classes and instances
+* Classes are defined by a class name and a list of methods.
+* Methods have the syntax of regular functions but without the `fun` keyword.
+* Fields are not listed in the class definition - they are added to instances dynamically.
+* Instances are created by 'calling' a class name like a function - `MyClass(a, b)`.
+* Constructors are optional - they are special methods with the name `init`. If a class has no `init` method, its instances are created with no fields (you can add them later).
+* Methods can use other class methods or fields of this instance through `this`. 
+
+Example:
+```
+class Empty {
+    print_field() { print this.later; }
+}
+var e = Empty();
+e.later = "hello";
+e.print_field(); // hello
+print e.later; // hello
+
+class Person {
+    init(name) { this.name = name; }
+    sayName() { print this.name; }
+}
+
+var jane = Person("Jane");
+jane.sayName(); // Jane
+
+// classes can be stored in variables
+var p = Person;
+
+var bill = p("Bill");
+bill.sayName = jane.sayName;
+bill.sayName(); // Jane again - functions are first-class and methods bind their instance
+```
+
