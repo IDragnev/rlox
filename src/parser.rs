@@ -970,6 +970,27 @@ mod tests {
                 args_str,
             )
         }
+
+        fn visit_get(&mut self, e: &Get) -> String {
+            format!(
+                "(get {} {})",
+                e.object.accept_string(self),
+                &e.name.lexeme,
+            )
+        }
+
+        fn visit_set(&mut self, e: &Set) -> String {
+            format!(
+                "(set {} {} {})",
+                e.object.accept_string(self),
+                &e.name.lexeme,
+                e.value.accept_string(self),
+            )
+        }
+
+        fn visit_this(&mut self, _: &This) -> String {
+            "this".to_owned()
+        }
     }
 
     #[test]
