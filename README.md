@@ -7,7 +7,7 @@ rlox [path-to-script-file]
 ```
 
 You can use the interpreter in [REPL](https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop) mode or by running a script file.  
-- Running the interpreter with no argument loads it in REPL mode. To exit the REPL type *q*.
+- Running the interpreter with no argument loads it in REPL mode. To exit the REPL type *:q*.
 - Running the interpreter with a path to a script loads the script and tries to execute it.
 
 ## Types

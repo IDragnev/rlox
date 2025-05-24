@@ -70,7 +70,7 @@ fn repl() -> Result<(), Error> {
         std::io::stdin().read_line(&mut input)?;
         input = input.trim().to_string();
         
-        if input == "q" {
+        if input == ":q" {
             break;
         }
 
