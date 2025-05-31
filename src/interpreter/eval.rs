@@ -9,6 +9,7 @@ use crate::{
     is_truthy,
     Instance,
     CallableWrapper,
+    bind_method,
 };
 use dumpster::unsync::Gc;
 use std::cell::RefCell;
@@ -276,6 +277,35 @@ impl expression::Visitor<EvalResult> for Interpreter {
             Err(RuntimeError::OnlyInstancesHaveProperties(
                 e.name.clone(),
             ))
+        }
+    }
+
+    fn visit_super(&mut self, e: &expression::Super) -> EvalResult {
+        let super_class = self.look_up_var(&e.keyword, e.hops_to_super)?;
+        if let RuntimeValue::Class(sup) = &super_class {
+            let this_token = Token {
+                token_type: TokenType::This,
+                lexeme: "this".to_owned(),
+                literal: None,
+                line: 0,
+                column: 0
+            };
+            let instance = self.look_up_var(&this_token, e.hops_to_this)?;
+            if let RuntimeValue::Instance(obj) = instance {
+                    let method = sup
+                    .borrow()
+                    .find_method(&e.method.lexeme)
+                    .ok_or(RuntimeError::UndefinedProperty(e.method.clone()))?;
+
+                return Ok(RuntimeValue::Callable(bind_method(&method, &obj)));
+            }
+            else {
+                panic!("'this' evaluated wrong");
+            }
+        }
+        else {
+            // should never happen
+            panic!("'super' evaluated wrong");
         }
     }
 }

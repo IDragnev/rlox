@@ -243,6 +243,13 @@ impl statement::Visitor<ExecResult> for Interpreter {
 
         self.current_env.borrow_mut().define(&s.name.lexeme, &RuntimeValue::Nil);
 
+        if let Some(sup) = &super_class {
+            let mut env = Environment::child(self.current_env.clone());
+            env.define("super", &RuntimeValue::Class(sup.clone()));
+
+            self.current_env = Gc::new(RefCell::new(env));
+        }
+
         let mut class_methods: HashMap<String, CallableWrapper> = HashMap::new();
         for f in &s.methods {
             let is_initializer = f.name.lexeme == "init";
@@ -257,6 +264,15 @@ impl statement::Visitor<ExecResult> for Interpreter {
             };
 
             class_methods.insert(f.name.lexeme.clone(), method);
+        }
+
+        if let Some(_) = &super_class {
+            let previous = self.current_env
+                .borrow()
+                .parent
+                .clone()
+                .expect("previous environment is non-null");
+            self.current_env = previous;
         }
 
         let class =  RuntimeValue::Class(Gc::new(RefCell::new(

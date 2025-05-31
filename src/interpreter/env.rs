@@ -11,7 +11,7 @@ use dumpster::{
 
 #[derive(Clone)]
 pub struct Environment {
-    parent: Option<Gc<RefCell<Environment>>>,
+    pub parent: Option<Gc<RefCell<Environment>>>,
     bindings: HashMap<String, RuntimeValue>,
 }
 

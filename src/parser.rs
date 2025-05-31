@@ -3,7 +3,20 @@ use crate::scanner::{
     TokenType,
 };
 use crate::expression::{
-    self, Assignment, Binary, Call, Expr, Get, Grouping, Literal, Logical, Set, This, Unary, Variable
+    self,
+    Binary,
+    Expr,
+    Grouping,
+    Literal,
+    Unary,
+    Variable,
+    Assignment,
+    Logical,
+    Call,
+    Get,
+    Set,
+    This,
+    Super,
 };
 use crate::statement::{
     self,
@@ -815,6 +828,16 @@ impl Parser {
                         hops: None,
                     }))
                 },
+                TokenType::Super => {
+                    let _ = self.consume_token(iter, TokenType::Dot)?;
+                    let method = self.consume_token(iter, TokenType::Identifier)?;
+                    return Ok(Box::new(Super {
+                        keyword: token.clone(),
+                        method,
+                        hops_to_super: None,
+                        hops_to_this: None,
+                    }))
+                }
                 _ => {
                     return Err(ParseError {
                         error_type: ParseErrorType::ExpectedExpression,

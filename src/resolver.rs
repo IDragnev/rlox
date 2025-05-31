@@ -202,7 +202,27 @@ impl Resolver {
         }
     }
 
-    
+    fn define_super(&mut self) {
+        let name = Token {
+            token_type: TokenType::Super,
+            lexeme: "super".to_owned(),
+            literal: None,
+            line: 0,
+            column: 0,
+        };
+
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.insert(
+                name.lexeme.clone(),
+                LocalVarState {
+                    var_name: name.clone(),
+                    init_state: VarInitializerState::Resolved,
+                    used: true, // must not emit a warning
+                }
+            );
+        }
+    }
+
     fn resolve_local(&mut self, name: &Token) -> Option<usize> {
         for (i, scope) in self.scopes.iter_mut().rev().enumerate() {
             match scope.get_mut(&name.lexeme) {
@@ -291,6 +311,17 @@ impl expression::MutVisitor<()> for Resolver {
         }
 
         e.hops = self.resolve_local(&e.keyword);
+    }
+
+    fn visit_super(&mut self, e: &mut expression::Super) {
+        e.hops_to_super = self.resolve_local(&e.keyword);
+        e.hops_to_this = self.resolve_local(&Token {
+            token_type: TokenType::This,
+            lexeme: "this".to_owned(),
+            literal: None,
+            line: 0,
+            column: 0
+        });
     }
 }
 
@@ -402,7 +433,12 @@ impl statement::MutVisitor<()> for Resolver {
             sup.hops = self.resolve_local(&sup.name);
         }
 
-        self.begin_scope();
+        if s.super_class.is_some() {
+            self.begin_scope(); // super
+            self.define_super();
+        }
+
+        self.begin_scope(); // this
         self.define_this();
 
         for m in &mut s.methods {
@@ -422,7 +458,11 @@ impl statement::MutVisitor<()> for Resolver {
             self.context.pop(); // method
         }
 
-        self.end_scope();
+        self.end_scope(); // this
+
+        if s.super_class.is_some() {
+            self.end_scope(); // super
+        }
 
         self.context.pop(); // class
     }

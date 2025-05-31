@@ -79,6 +79,14 @@ pub struct This {
     pub hops: Option<usize>,
 }
 
+#[derive(Clone)]
+pub struct Super {
+    pub keyword: Token,
+    pub method: Token,
+    pub hops_to_super: Option<usize>,
+    pub hops_to_this: Option<usize>,
+}
+
 pub trait Visitor<T> {
     fn visit_literal(&mut self, e: &Literal) -> T;
     fn visit_unary(&mut self, e: &Unary) -> T;
@@ -91,6 +99,7 @@ pub trait Visitor<T> {
     fn visit_get(&mut self, e: &Get) -> T;
     fn visit_set(&mut self, e: &Set) -> T;
     fn visit_this(&mut self, e: &This) -> T;
+    fn visit_super(&mut self, e: &Super) -> T;
 }
 
 pub trait MutVisitor<T> {
@@ -105,6 +114,7 @@ pub trait MutVisitor<T> {
     fn visit_get(&mut self, e: &mut Get) -> T;
     fn visit_set(&mut self, e: &mut Set) -> T;
     fn visit_this(&mut self, e: &mut This) -> T;
+    fn visit_super(&mut self, e: &mut Super) -> T;
 }
 
 pub enum AssignTarget {
@@ -272,5 +282,18 @@ impl Expr for This {
     }
     fn accept_resolve(&mut self, v: &mut dyn MutVisitor<()>) {
         v.visit_this(self)
+    }
+}
+
+impl Expr for Super {
+    fn accept_string(&self, v: &mut dyn Visitor<String>) -> String {
+        v.visit_super(self)
+    }
+
+    fn accept_rt_value(&self, v: &mut dyn Visitor<RuntimeResult>) -> RuntimeResult {
+        v.visit_super(self)
+    }
+    fn accept_resolve(&mut self, v: &mut dyn MutVisitor<()>) {
+        v.visit_super(self)
     }
 }
