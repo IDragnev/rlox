@@ -1011,6 +1011,10 @@ mod tests {
         fn visit_this(&mut self, _: &This) -> String {
             "this".to_owned()
         }
+
+        fn visit_super(&mut self, _: &Super) -> String {
+            "super".to_owned()
+        }
     }
 
     #[test]
