@@ -16,7 +16,7 @@ You can use the interpreter in [REPL](https://en.wikipedia.org/wiki/Read%E2%80%9
 - **string** - string literals are sequences of characters enclosed in double quotes, such as *"hello"*.
 - **functions** - Lox has [first-class functions](https://en.wikipedia.org/wiki/First-class_function). It supports passing functions as arguments to other functions, returning them as the values from other functions, and assigning them to variables.
 - **nil** - the **nil** type has a single value - *nil*. It represents the [null value](https://en.wikipedia.org/wiki/Nullable_type). It is the value of any uninitialized variable and the default return value of functions.
-- **classes** - user defined types with methods and dynamic fields. Inheritance is coming soon.
+- **classes** - user defined types with methods and dynamic fields. Inheritance is also supported.
 
 ## Working with values
 ### Variables and functions
@@ -132,6 +132,8 @@ print b; // nil
 * Instances are created by 'calling' a class name like a function - `MyClass(a, b)`.
 * Constructors are optional - they are special methods with the name `init`. If a class has no `init` method, its instances are created with no fields (you can add them later).
 * Methods can use other class methods or fields of this instance through `this`. 
+* Classes can inherit from other classes to reuse functionality. The syntax is `class SubClass < SuperClass { ... }`
+* In order to call superclass methods, you should use `super`.
 
 Example:
 ```
@@ -159,3 +161,23 @@ bill.sayName = jane.sayName;
 bill.sayName(); // Jane again - functions are first-class and methods bind their instance
 ```
 
+Inheritance:
+```
+class A {
+    f() { print "A"; }
+}
+
+class B < A {
+    // overrides the inherited method 'f'
+    f() {
+        print "B";
+        super.f();
+    }
+}
+
+class C < B { }
+
+C().f();
+// "B"
+// "A"
+```
