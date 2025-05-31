@@ -61,6 +61,7 @@ pub enum RuntimeError {
     },
     OnlyInstancesHaveProperties(Token),
     UndefinedProperty(Token),
+    SuperClassMustBeAClass(Token),
 }
 
 pub type RuntimeResult = Result<RuntimeValue, RuntimeError>;
@@ -82,15 +83,32 @@ pub struct Function {
 #[derive(Clone)]
 pub struct Class {
     pub name: String,
-    pub methods: HashMap<String, CallableWrapper>,
+    super_class: Option<Gc<RefCell<Class>>>,
+    methods: HashMap<String, CallableWrapper>,
 }
 
 impl Class {
-    pub fn new(name: &str, methods: HashMap<String, CallableWrapper>) -> Self {
+    pub fn new(
+        name: &str,
+        super_class: Option<Gc<RefCell<Class>>>,
+        methods: HashMap<String, CallableWrapper>,
+    ) -> Self {
         Self {
             name: name.to_owned(),
+            super_class,
             methods,
         }
+    }
+
+    pub fn find_method(&self, name: &str) -> Option<CallableWrapper> {
+        let mut method = self.methods.get(name).map(|m| m.clone());
+        if method.is_none() {
+            if let Some(sup) = &self.super_class {
+                method = sup.borrow().find_method(name);
+            }
+        }
+
+        method
     }
 }
 
@@ -116,10 +134,9 @@ impl Instance {
 
         self.class
             .borrow()
-            .methods
-            .get(name)
+            .find_method(name)
             .map(|m| {
-                RuntimeValue::Callable(bind_method(m, self_ptr))
+                RuntimeValue::Callable(bind_method(&m, self_ptr))
             })
     }
 

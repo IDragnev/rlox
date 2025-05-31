@@ -3,18 +3,7 @@ use crate::scanner::{
     TokenType,
 };
 use crate::expression::{
-    Binary,
-    Expr,
-    Grouping,
-    Literal,
-    Unary,
-    Variable,
-    Assignment,
-    Logical,
-    Call,
-    Get,
-    Set,
-    This,
+    self, Assignment, Binary, Call, Expr, Get, Grouping, Literal, Logical, Set, This, Unary, Variable
 };
 use crate::statement::{
     self,
@@ -126,6 +115,13 @@ impl Parser {
     ) -> Result<Box<dyn Stmt>, ParseError> {
         let _ = self.consume_token(iter, TokenType::Class)?;
         let name = self.consume_token(iter, TokenType::Identifier)?;
+        let mut super_class = None;
+        if let Ok(_) = self.consume_token(iter, TokenType::Less) {
+            super_class = Some(expression::Variable {
+                name: self.consume_token(iter, TokenType::Identifier)?,
+                hops: None,
+            });
+        }
         let _ = self.consume_token(iter, TokenType::LeftBrace)?;
 
         let mut methods = Vec::new();
@@ -152,6 +148,7 @@ impl Parser {
 
         Ok(Box::new(statement::Class {
             name,
+            super_class,
             methods,
         }))
     }

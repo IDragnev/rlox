@@ -51,6 +51,7 @@ pub enum ResolutionError {
     CantReturnValueFromAnInitializer(Token),
     BreakNotInLoop(Token),
     ThisNotInsideClass(Token),
+    ClassCantInheritFromItself(Token),
 }
 
 #[derive(Debug, Clone)]
@@ -391,6 +392,15 @@ impl statement::MutVisitor<()> for Resolver {
         // allow storing a class as a local variable
         self.declare(&s.name);
         self.define(&s.name);
+
+        if let Some(sup) = &mut s.super_class {
+            if sup.name.lexeme == s.name.lexeme {
+                self.add_err(ResolutionError::ClassCantInheritFromItself(sup.name.clone()));
+                return;
+            }
+
+            sup.hops = self.resolve_local(&sup.name);
+        }
 
         self.begin_scope();
         self.define_this();

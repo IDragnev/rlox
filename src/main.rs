@@ -310,7 +310,13 @@ fn report_resolution_errors(errs: &Vec<rlox::resolver::ResolutionError>) {
                  err.line,
                  err.column,
                 )
-            }
+            },
+            ResolutionError::ClassCantInheritFromItself(err) => {
+                ("A Class can't inherit from itself".to_owned(),
+                 err.line,
+                 err.column,
+                )
+            },
         };
 
         println!("Compile Error: {}, line {}, column {}.", err_msg, line, col);
@@ -369,6 +375,12 @@ fn report_runtime_error(err: &RuntimeError) {
         },
         RuntimeError::UndefinedProperty(token) => {
             (format!("Undefined property '{}'", &token.lexeme),
+             token.line,
+             token.column,
+            )
+        },
+        RuntimeError::SuperClassMustBeAClass(token) => {
+            (format!("Superclass must be a class: '{}'", &token.lexeme),
              token.line,
              token.column,
             )

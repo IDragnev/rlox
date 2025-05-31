@@ -230,6 +230,17 @@ impl statement::Visitor<ExecResult> for Interpreter {
     fn visit_class(&mut self, s: &statement::Class) -> ExecResult {
         use crate::{ Callable, Function };
 
+        let mut super_class = None;
+        if let Some(sup) = &s.super_class {
+            let sup_expr: Box<dyn expression::Expr> = Box::new(sup.clone());
+            if let RuntimeValue::Class(c) = self.evaluate_expr(&sup_expr)? {
+                super_class = Some(c);
+            }
+            else {
+                return Err(RuntimeError::SuperClassMustBeAClass(sup.name.clone()))
+            }
+        }
+
         self.current_env.borrow_mut().define(&s.name.lexeme, &RuntimeValue::Nil);
 
         let mut class_methods: HashMap<String, CallableWrapper> = HashMap::new();
@@ -249,7 +260,7 @@ impl statement::Visitor<ExecResult> for Interpreter {
         }
 
         let class =  RuntimeValue::Class(Gc::new(RefCell::new(
-            Class::new(&s.name.lexeme, class_methods)
+            Class::new(&s.name.lexeme, super_class, class_methods)
         )));
         self.current_env.borrow_mut().assign(&s.name.lexeme, &class);
 

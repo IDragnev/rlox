@@ -1,5 +1,5 @@
 use crate::{
-    expression::Expr,
+    expression::{self, Expr},
     scanner::Token,
     RuntimeError,
     RuntimeValue,
@@ -60,6 +60,7 @@ pub struct Return {
 #[derive(Clone)]
 pub struct Class {
     pub name: Token,
+    pub super_class: Option<expression::Variable>,
     pub methods: Vec<Function>,
 }
 
