@@ -34,6 +34,7 @@ enum Context {
     InitializerMethod,
     Loop,
     Class,
+    SubClass,
 }
 
 pub struct Resolver {
@@ -52,6 +53,8 @@ pub enum ResolutionError {
     BreakNotInLoop(Token),
     ThisNotInsideClass(Token),
     ClassCantInheritFromItself(Token),
+    SuperOutsideClass(Token),
+    SuperInsideClassWithNoSuperClass(Token),
 }
 
 #[derive(Debug, Clone)]
@@ -305,7 +308,7 @@ impl expression::MutVisitor<()> for Resolver {
     }
 
     fn visit_this(&mut self, e: &mut expression::This) {
-        if let None = self.context.iter().find(|&c| *c == Context::Class) {
+        if let None = self.context.iter().find(|&c| *c == Context::Class || *c == Context::SubClass) {
             self.add_err(ResolutionError::ThisNotInsideClass(e.keyword.clone()));
             return;
         }
@@ -314,6 +317,25 @@ impl expression::MutVisitor<()> for Resolver {
     }
 
     fn visit_super(&mut self, e: &mut expression::Super) {
+        let mut inside_class = false;
+        let mut inside_subclass = false;
+        for &c in self.context.iter() {
+            if c == Context::Class || c == Context::SubClass {
+                inside_class = true;
+                inside_subclass = c == Context::SubClass;
+                break;
+            }
+        }
+
+        if inside_class == false {
+            self.add_err(ResolutionError::SuperOutsideClass(e.keyword.clone()));
+            return;
+        }
+        if inside_subclass == false {
+            self.add_err(ResolutionError::SuperInsideClassWithNoSuperClass(e.keyword.clone()));
+            return;
+        }
+
         e.hops_to_super = self.resolve_local(&e.keyword);
         e.hops_to_this = self.resolve_local(&Token {
             token_type: TokenType::This,
@@ -401,7 +423,7 @@ impl statement::MutVisitor<()> for Resolver {
                 Context::Loop => {
                     return;
                 },
-                Context::Class => { },
+                Context::Class | Context::SubClass => { },
             }
         }
 
@@ -418,7 +440,12 @@ impl statement::MutVisitor<()> for Resolver {
     }
 
     fn visit_class(&mut self, s: &mut statement::Class) {
-        self.context.push(Context::Class);
+        if s.super_class.is_none() {
+            self.context.push(Context::Class);
+        }
+        else {
+            self.context.push(Context::SubClass);
+        }
 
         // allow storing a class as a local variable
         self.declare(&s.name);

@@ -317,6 +317,18 @@ fn report_resolution_errors(errs: &Vec<rlox::resolver::ResolutionError>) {
                  err.column,
                 )
             },
+            ResolutionError::SuperOutsideClass(err) => {
+                ("Can't use 'super' outside of class".to_owned(),
+                 err.line,
+                 err.column,
+                )
+            },
+            ResolutionError::SuperInsideClassWithNoSuperClass(err) => {
+                ("Can't use 'super' in a class with no superclass".to_owned(),
+                 err.line,
+                 err.column,
+                )
+            },
         };
 
         println!("Compile Error: {}, line {}, column {}.", err_msg, line, col);
